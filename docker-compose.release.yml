@@ -1,0 +1,55 @@
+# v0.1.0 initial development release. Built assets, no Vite runtime.
+# Authentication is fictional and loopback-only until the real provider is integrated.
+name: purrsonnel-release
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: purrsonnel
+      POSTGRES_PASSWORD: purrsonnel_dev_only
+      POSTGRES_DB: purrsonnel
+    volumes:
+      - release_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U purrsonnel -d purrsonnel"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  api:
+    image: purrsonnel-api:0.1.0
+    build:
+      context: ./apps/api
+      target: release
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    environment:
+      APP_ENV: development
+      DEV_AUTH_ENABLED: "true"
+      DEV_AUTH_DEFAULT_USER: dev.hr@purrsonnel.local
+      DATABASE_URL: postgres://purrsonnel:purrsonnel_dev_only@db:5432/purrsonnel
+      API_BIND: 0.0.0.0:3000
+      APP_PUBLIC_ORIGIN: http://localhost:${RELEASE_PORT:-8080}
+      MAX_VOLUNTEER_MINUTES: ${MAX_VOLUNTEER_MINUTES:-960}
+      WEB_PUSH_ENABLED: ${WEB_PUSH_ENABLED:-false}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      RUST_LOG: purrsonnel_api=info,tower_http=info
+    depends_on:
+      db: {condition: service_healthy}
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+  web:
+    image: purrsonnel-web:0.1.0
+    build:
+      context: ./apps/web
+      target: release
+    restart: unless-stopped
+    ports: ["127.0.0.1:${RELEASE_PORT:-8080}:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  release_postgres_data:

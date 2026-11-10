@@ -1,0 +1,30 @@
+{
+  "id": "/",
+  "name": "Purrsonnel",
+  "short_name": "Purrsonnel",
+  "description": "Your FWA teams, volunteer time, and requests in one place.",
+  "lang": "en-US",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fb",
+  "theme_color": "#482348",
+  "icons": [
+    { "src": "/branding/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/branding/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/branding/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Requests", "url": "/requests", "description": "Your team request inbox" },
+    {
+      "name": "Volunteer time",
+      "url": "/volunteer",
+      "description": "Log time and show your approval QR"
+    }
+  ]
+}

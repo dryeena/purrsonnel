@@ -1,0 +1,52 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #482348;
+  background: #f8f9fb;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+}
+main {
+  max-width: 440px;
+  margin: 15vh auto;
+  text-align: center;
+}
+img {
+  border-radius: 18px;
+}
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: #76657f;
+  margin: 28px 0 16px;
+}
+h1 {
+  font-size: 32px;
+  letter-spacing: -1px;
+}
+p {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #76657f;
+}
+.button {
+  display: inline-block;
+  text-decoration: none;
+  background: #482348;
+  color: #fff;
+  border-radius: 9px;
+  padding: 13px 28px;
+  margin: 16px 0;
+  min-height: 44px;
+}
+.button:focus-visible {
+  outline: 3px solid #92639f;
+  outline-offset: 4px;
+}
+.note {
+  font-size: 12px;
+}

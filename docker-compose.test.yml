@@ -1,0 +1,33 @@
+services:
+  test-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: purrsonnel_test
+      POSTGRES_PASSWORD: testing_only
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U purrsonnel_test -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs: ["/var/lib/postgresql/data"]
+  api-test:
+    build:
+      context: ./apps/api
+      target: toolchain
+    working_dir: /app
+    volumes: ["./apps/api:/app", "cargo_registry:/usr/local/cargo/registry", "cargo_target:/app/target"]
+    environment:
+      DATABASE_URL: postgres://purrsonnel_test:testing_only@test-db:5432/postgres
+    depends_on:
+      test-db: {condition: service_healthy}
+    command: ["cargo", "test", "--all-targets"]
+  web-test:
+    image: node:22-alpine
+    working_dir: /app
+    volumes: ["./apps/web:/app", "test_node_modules:/app/node_modules"]
+    command: ["sh", "-c", "npm ci && npm run check && npm run build"]
+volumes:
+  cargo_registry:
+  cargo_target:
+  test_node_modules:

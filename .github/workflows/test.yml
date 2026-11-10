@@ -1,0 +1,51 @@
+name: Test
+on: [push, pull_request]
+jobs:
+  docker-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.release.yml config --quiet
+      - run: docker compose -f docker-compose.release.yml up --build --wait --wait-timeout 300
+      - name: Check packaged app and fictional login
+        run: |
+          curl --fail --silent http://localhost:8080/health/ready --output /dev/null
+          curl --fail --silent http://localhost:8080/requests --output /dev/null
+          curl --fail --silent --request POST --header 'Origin: http://localhost:8080' http://localhost:8080/api/v1/auth/dev/bootstrap --output /dev/null
+      - if: always()
+        run: docker compose -f docker-compose.release.yml logs --tail 100 api web
+      - if: always()
+        run: docker compose -f docker-compose.release.yml down
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U test -d postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://test:test@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/api
+      - run: cargo test --all-targets
+        working-directory: apps/api
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm run check && npm run build
+        working-directory: apps/web
