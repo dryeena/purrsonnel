@@ -174,7 +174,7 @@ describe('explicit action feedback', () => {
         <Status value="pending_identity" />
       </>,
     );
-    expect(screen.getByText('approved')).toBeVisible();
-    expect(screen.getByText('pending identity')).toBeVisible();
+    expect(screen.getByText('Approved')).toBeVisible();
+    expect(screen.getByText('Pending identity')).toBeVisible();
   });
 });

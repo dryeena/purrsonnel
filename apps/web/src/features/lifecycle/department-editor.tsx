@@ -12,7 +12,7 @@ export function DepartmentEditor({ department }: { department: Row }) {
   const me = useAuth();
   const [open, setOpen] = useState(false);
   const { data: people } = useData<Row>(
-    can(me, 'organization.manage') ? '/users?page_size=100' : null,
+    can(me, 'organization.manage') ? `/users?department=${department.id}&page_size=100` : null,
   );
   if (!can(me, 'organization.manage')) return null;
   return (

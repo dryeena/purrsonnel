@@ -5,7 +5,7 @@ use sea_orm::sea_query::{Alias, Condition, Expr, Func, LockType, OnConflict, Ord
 use crate::entities::*;
 mod postgres {
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
-pub(super) const APPLICABLE_SELECT_TERMS: &str = "SELECT jsonb_build_object('id',t.id,'title',t.title,'audience',t.audience,'version_id',v.id,'version_number',v.version_number,'body_markdown',v.body_markdown,'body_sha256',v.body_sha256,'published_at',v.published_at,'signed_at',sig.consented_at,'typed_name',sig.typed_name) FROM terms t JOIN term_versions v ON v.term_id=t.id AND v.published_at IS NOT NULL AND v.superseded_at IS NULL LEFT JOIN term_signatures sig ON sig.term_version_id=v.id AND sig.user_id=$1 WHERE applicable_term(t.id,$1) ORDER BY t.title";
+pub(super) const APPLICABLE_SELECT_TERMS: &str = "SELECT jsonb_build_object('id',t.id,'title',t.title,'audience',t.audience,'version_id',v.id,'version_number',v.version_number,'body_markdown',v.body_markdown,'body_sha256',v.body_sha256,'fields',v.form_schema_json,'published_at',v.published_at,'signed_at',sig.consented_at,'typed_name',sig.typed_name,'answers',sig.answers_json,'signature_svg',sig.signature_svg) FROM terms t JOIN term_versions v ON v.term_id=t.id AND v.published_at IS NOT NULL AND v.superseded_at IS NULL LEFT JOIN term_signatures sig ON sig.term_version_id=v.id AND sig.user_id=$1 WHERE applicable_term(t.id,$1) ORDER BY t.title";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const LIST_SELECT_TERM_VERSIONS: &str = "SELECT to_jsonb(t)||jsonb_build_object('versions',COALESCE((SELECT jsonb_agg(to_jsonb(v) ORDER BY version_number DESC) FROM term_versions v WHERE term_id=t.id),'[]')) FROM terms t ORDER BY title";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
@@ -13,7 +13,7 @@ pub(super) const VERSION_INSERT_TERM_VERSIONS: &str = "INSERT INTO term_versions
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const PUBLISH_SELECT_TERM_VERSIONS: &str = "SELECT EXISTS(SELECT 1 FROM term_versions WHERE id=$1 AND term_id=$2 AND published_at IS NULL)";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
-pub(super) const SIGN_INSERT_TERM_SIGNATURES: &str = "INSERT INTO term_signatures(term_version_id,user_id,typed_name,affirmation_text,document_sha256) VALUES($1,$2,$3,'I have read this exact version and agree to acknowledge it.',$4) ON CONFLICT(term_version_id,user_id) DO NOTHING RETURNING to_jsonb(term_signatures)";
+pub(super) const SIGN_INSERT_TERM_SIGNATURES: &str = "INSERT INTO term_signatures(term_version_id,user_id,typed_name,affirmation_text,document_sha256,answers_json,signature_svg,method) VALUES($1,$2,$3,'I have read this exact version and agree to acknowledge it.',$4,$5,$6,'drawn_signature') ON CONFLICT(term_version_id,user_id) DO NOTHING RETURNING to_jsonb(term_signatures)";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const COMPLIANCE_SELECT_USERS: &str = "SELECT jsonb_build_object('user_id',u.id,'display_name',u.display_name,'term_id',t.id,'title',t.title,'version_number',v.version_number,'signed_at',sig.consented_at) FROM users u CROSS JOIN terms t JOIN term_versions v ON v.term_id=t.id AND v.published_at IS NOT NULL AND v.superseded_at IS NULL LEFT JOIN term_signatures sig ON sig.term_version_id=v.id AND sig.user_id=u.id WHERE visible_person($1,u.id,'terms.read_compliance') AND applicable_term(t.id,u.id) AND u.status='active' ORDER BY u.display_name,t.title LIMIT 1000";
 }
@@ -43,12 +43,12 @@ pub async fn create_insert_terms<C: ConnectionTrait, T: TryGetable>(db: &C, p1: 
     db.query_one(statement).await?.ok_or_else(|| DbErr::RecordNotFound("Record not found".into()))?.try_get_by_index(0)
 }
 
-pub async fn create_insert_term_versions<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>) -> Result<T, DbErr> {
+pub async fn create_insert_term_versions<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>, p4: impl Into<Value>) -> Result<T, DbErr> {
     let p1: Value = p1.into();
     let p2: Value = p2.into();
     let p3: Value = p3.into();
-    let mut query = Query::insert();
-    query.into_table(term_versions::Entity).columns([term_versions::Column::TermId, term_versions::Column::VersionNumber, term_versions::Column::BodyMarkdown, term_versions::Column::BodySha256]).values_panic([Expr::value(p1.clone()).into(), Expr::value(1i32).into(), Expr::value(p2.clone()).into(), Expr::value(p3.clone()).into()]);
+    let p4: Value = p4.into(); let mut query = Query::insert();
+    query.into_table(term_versions::Entity).columns([term_versions::Column::TermId, term_versions::Column::VersionNumber, term_versions::Column::BodyMarkdown, term_versions::Column::BodySha256, term_versions::Column::FormSchemaJson]).values_panic([Expr::value(p1.clone()).into(), Expr::value(1i32).into(), Expr::value(p2.clone()).into(), Expr::value(p3.clone()).into(), Expr::value(p4.clone()).into()]);
     query.returning(Query::returning().column(term_versions::Column::Id));
     let statement = db.get_database_backend().build(&query);
     db.query_one(statement).await?.ok_or_else(|| DbErr::RecordNotFound("Record not found".into()))?.try_get_by_index(0)
@@ -139,18 +139,21 @@ pub async fn sign_select_term_versions_2<C: ConnectionTrait, T: TryGetable>(db: 
     let p2: Value = p2.into();
     let mut query = Query::select();
     query.from(term_versions::Entity);
-    query.expr(SimpleExpr::from(Expr::col(term_versions::Column::BodySha256)));
+    query.expr(SimpleExpr::from(Func::cust(Alias::new("jsonb_build_object")).args([
+        Expr::val("digest").into(), Expr::col(term_versions::Column::BodySha256).into(),
+        Expr::val("fields").into(), Expr::col(term_versions::Column::FormSchemaJson).into(),
+    ])));
     query.cond_where(Condition::all().add(Expr::expr(SimpleExpr::from(Expr::col(term_versions::Column::Id))).eq(Expr::value(p1.clone()))).add(Expr::expr(SimpleExpr::from(Expr::col(term_versions::Column::PublishedAt))).is_not_null()).add(Expr::expr(SimpleExpr::from(Expr::col(term_versions::Column::SupersededAt))).is_null()).add(SimpleExpr::from(Func::cust(Alias::new("applicable_term")).args([SimpleExpr::from(Expr::col(term_versions::Column::TermId)), Expr::value(p2.clone())]))));
     let statement = db.get_database_backend().build(&query);
     db.query_one(statement).await?.map(|row| row.try_get_by_index(0)).transpose()
 }
 
-pub async fn sign_insert_term_signatures<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>, p4: impl Into<Value>) -> Result<Option<T>, DbErr> {
+pub async fn sign_insert_term_signatures<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>, p4: impl Into<Value>, p5: impl Into<Value>, p6: impl Into<Value>) -> Result<Option<T>, DbErr> {
     let p1: Value = p1.into();
     let p2: Value = p2.into();
     let p3: Value = p3.into();
     let p4: Value = p4.into();
-    let statement = Statement::from_sql_and_values(DbBackend::Postgres, postgres::SIGN_INSERT_TERM_SIGNATURES, vec![p1, p2, p3, p4]);
+    let p5: Value=p5.into(); let p6: Value=p6.into(); let statement = Statement::from_sql_and_values(DbBackend::Postgres, postgres::SIGN_INSERT_TERM_SIGNATURES, vec![p1, p2, p3, p4,p5,p6]);
     db.query_one(statement).await?.map(|row| row.try_get_by_index(0)).transpose()
 }
 

@@ -1,5 +1,7 @@
 import type { ComponentChildren } from 'preact';
 
+import { humanize } from '../../lib/text';
+
 import { Icon } from './icon';
 
 export function Badge({
@@ -25,7 +27,7 @@ export function Status({ value }: { value: string }) {
           : ['rejected', 'deny', 'former', 'partially_failed'].includes(value)
             ? 'red'
             : 'neutral';
-  return <Badge tone={tone}>{value.replaceAll('_', ' ')}</Badge>;
+  return <Badge tone={tone}>{humanize(value)}</Badge>;
 }
 
 export function Avatar({ name, small = false }: { name: string; small?: boolean }) {

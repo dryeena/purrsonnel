@@ -35,7 +35,7 @@ pub(super) const ADD_NOTE_SELECT_INTERVIEWS: &str = "SELECT EXISTS(SELECT 1 FROM
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const FINALIZE_SELECT_APPLICATIONS: &str = "SELECT a.status,a.applicant_user_id,pos.department_id,pos.hiring_owner_user_id,l.personnel_level_id FROM applications a JOIN position_postings pos ON pos.id=a.position_posting_id JOIN position_levels l ON l.id=pos.position_level_id WHERE a.id=$1 FOR UPDATE OF a FOR SHARE OF pos,l";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
-pub(super) const FINALIZE_UPDATE_USERS: &str = "UPDATE users SET personnel_level_id=CASE WHEN COALESCE((SELECT rank FROM personnel_levels WHERE id=users.personnel_level_id),0)>(SELECT rank FROM personnel_levels WHERE id=$2) THEN personnel_level_id ELSE $2 END,updated_at=now() WHERE id=$1";
+pub(super) const FINALIZE_UPDATE_USERS: &str = "UPDATE users SET personnel_level_id=CASE WHEN COALESCE((SELECT rank FROM personnel_levels WHERE id=users.personnel_level_id),0)>(SELECT rank FROM personnel_levels WHERE id=$2) THEN personnel_level_id ELSE $2 END,volunteer_eligible=false,updated_at=now() WHERE id=$1";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const FINALIZE_INSERT_USER_DEPARTMENTS: &str = "INSERT INTO user_departments(user_id,department_id) VALUES($1,$2) ON CONFLICT(user_id,department_id) WHERE ended_at IS NULL DO NOTHING";
 }

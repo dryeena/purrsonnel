@@ -15,6 +15,8 @@ pub struct Model {
     pub server_received_at: chrono::DateTime<chrono::Utc>,
     pub document_sha256: String,
     pub method: String,
+    pub answers_json: Json,
+    pub signature_svg: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 
+import { humanize } from '../../lib/text';
 import type { Row } from '../../types/api';
 
 export function describeFilter(value: Row): string {
@@ -8,7 +9,7 @@ export function describeFilter(value: Row): string {
       ? value.args.map(describeFilter).join(` ${value.op.toUpperCase()} `)
       : 'All people in your scope';
   if (value.op === 'not') return `NOT (${describeFilter(value.arg)})`;
-  return `${value.field.replaceAll('_', ' ')} ${value.op} ${String(value.value ?? '')}`;
+  return `${humanize(value.field)} ${value.op} ${String(value.value ?? '')}`;
 }
 
 export function FilterBuilder({ value, onChange }: { value: Row; onChange: (v: Row) => void }) {
@@ -52,7 +53,7 @@ export function FilterBuilder({ value, onChange }: { value: Row; onChange: (v: R
           {['status', 'display_name', 'department', 'level', 'myfwa_id', 'volunteer_eligible'].map(
             (f) => (
               <option key={f} value={f}>
-                {f.replaceAll('_', ' ')}
+                {humanize(f)}
               </option>
             ),
           )}

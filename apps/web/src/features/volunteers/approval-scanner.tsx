@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { ErrorBox, Form, Icon, Modal } from '../../components/ui';
 import { date } from '../../lib/date';
 import { refresh } from '../../lib/events';
+import { uuid } from '../../lib/uuid';
 import { api } from '../../services/api-client';
 import type { Row } from '../../types/api';
 import type { BarcodeDetectorConstructor } from '../../types/browser';
 
 export function Scanner({ onClose }: { onClose: () => void }) {
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(uuid);
   const [raw, setRaw] = useState(new URLSearchParams(location.search).get('t') || '');
   const [entry, setEntry] = useState<Row | null>(null);
   const [error, setError] = useState('');

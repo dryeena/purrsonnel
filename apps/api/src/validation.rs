@@ -13,6 +13,7 @@ pub fn validate_schema(schema:&Value)->Result<()> {
  }
  Ok(())
 }
+pub fn signature_svg(value:&str)->Result<()> {if value.len()>50_000||!value.starts_with("<svg")||!value.ends_with("</svg>")||!value.contains("<path")||!value.chars().all(|c|c.is_ascii_alphanumeric()||" <>/=\"'.,:-\n".contains(c)){return Err(ApiError::bad("Draw a valid signature"));}Ok(())}
 pub fn validate_answers(schema:&Value,answers:&Value)->Result<()> {
  let fields=schema.as_array().ok_or_else(||ApiError::bad("Invalid form"))?;
  let obj=answers.as_object().ok_or_else(||ApiError::bad("Answers must be an object"))?;

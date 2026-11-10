@@ -8,6 +8,7 @@ mod postgres {
 pub(super) const PENDING_PERSON_SELECT_POSITION_POSTINGS: &str = "SELECT pos.department_id,f.schema_json FROM position_postings pos JOIN form_template_versions f ON f.id=pos.form_template_version_id WHERE pos.id=$1 AND pos.status='open' FOR SHARE OF pos";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const DEPARTMENT_UPDATE_DEPARTMENTS: &str = "UPDATE departments SET name=COALESCE($2,name),description=COALESCE($3,description),lead_user_id=CASE WHEN $5 THEN NULL ELSE COALESCE($4,lead_user_id) END,active=COALESCE($6,active) WHERE id=$1";
+pub(super) const DEPARTMENT_SELECT_USER_DEPARTMENTS: &str = "SELECT EXISTS(SELECT 1 FROM user_departments WHERE department_id=$1 AND user_id=$2 AND ended_at IS NULL)";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const DIVISION_UPDATE_DIVISIONS: &str = "UPDATE divisions SET name=COALESCE($2,name),description=COALESCE($3,description),lead_user_id=CASE WHEN $5 THEN NULL ELSE COALESCE($4,lead_user_id) END,active=COALESCE($6,active) WHERE id=$1";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
@@ -59,6 +60,11 @@ pub async fn department_update_departments<C: ConnectionTrait>(db: &C, p1: impl 
     let p6: Value = p6.into();
     let statement = Statement::from_sql_and_values(DbBackend::Postgres, postgres::DEPARTMENT_UPDATE_DEPARTMENTS, vec![p1, p2, p3, p4, p5, p6]);
     db.execute(statement).await
+}
+
+pub async fn department_select_user_departments<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>) -> Result<T, DbErr> {
+    let statement = Statement::from_sql_and_values(DbBackend::Postgres, postgres::DEPARTMENT_SELECT_USER_DEPARTMENTS, vec![p1.into(), p2.into()]);
+    db.query_one(statement).await?.ok_or_else(|| DbErr::RecordNotFound("Record not found".into()))?.try_get_by_index(0)
 }
 
 pub async fn division_update_divisions<C: ConnectionTrait>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>, p4: impl Into<Value>, p5: impl Into<Value>, p6: impl Into<Value>) -> Result<ExecResult, DbErr> {

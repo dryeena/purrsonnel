@@ -108,7 +108,7 @@ export function Settings(_: { path?: string }) {
                 type: 'select',
                 required: true,
                 options: (add === 'field'
-                  ? ['text', 'number', 'date', 'boolean', 'url']
+                  ? ['text', 'number', 'date', 'boolean', 'single_select', 'multi_select', 'url']
                   : ['text', 'textarea', 'number', 'date', 'boolean', 'url']
                 ).map((v) => ({ value: v, label: v })),
               },
@@ -136,6 +136,13 @@ export function Settings(_: { path?: string }) {
                       ],
                     },
                     {
+                      name: 'choices_text',
+                      label: 'Dropdown choices (one per line)',
+                      type: 'textarea',
+                      help: 'Used for dropdown and multi-select fields only.',
+                      maxLength: 4000,
+                    },
+                    {
                       name: 'max_length',
                       label: 'Maximum text length',
                       type: 'number',
@@ -158,6 +165,17 @@ export function Settings(_: { path?: string }) {
             ]}
             submit="Create"
             onSubmit={async (b) => {
+              if (add === 'field') {
+                const choices = String(b.choices_text || '')
+                  .split(/\r?\n/)
+                  .map((choice) => choice.trim())
+                  .filter(Boolean);
+                delete b.choices_text;
+                if (['single_select', 'multi_select'].includes(b.type) && choices.length === 0) {
+                  throw new Error('Add at least one dropdown choice.');
+                }
+                b.choices = choices;
+              }
               await api(add === 'field' ? '/profile-fields' : '/default-questions', 'POST', b);
               setAdd('');
               refresh();

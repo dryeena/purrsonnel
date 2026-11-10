@@ -6,7 +6,7 @@ import { Feedback } from './components/feedback';
 import { InstallApp } from './components/install';
 import { Notifications } from './components/notifications';
 import { Avatar, Badge, ErrorBox, Icon, Loading } from './components/ui';
-import { Audit, Lists, Organization, Settings } from './features/administration';
+import { Audit, Lists, Organization, Reports, Settings } from './features/administration';
 import { Dashboard } from './features/dashboard';
 import { Applications, Interviews, Positions } from './features/hiring';
 import { People } from './features/people';
@@ -35,6 +35,7 @@ const nav = [
   { label: 'Lists & bulk actions', path: '/lists', icon: 'list', permission: 'people.bulk_update' },
   { label: 'Settings', path: '/settings', icon: 'settings', permission: 'settings.manage' },
   { label: 'Audit log', path: '/audit', icon: 'audit', permission: 'audit.read' },
+  { label: 'Reports', path: '/reports', icon: 'list', permission: 'people.read' },
 ];
 
 export function App() {
@@ -314,11 +315,12 @@ export function App() {
               <Lists path="/lists" />
               <Settings path="/settings" />
               <Audit path="/audit" />
+              <Reports path="/reports" />
               <NotFound default />
             </Router>
           </main>
           <footer class="app-footer">
-            <span>Purrsonnel · People make it happen.</span>
+            <span>Purrsonnel · People make the magic happen.</span>
             <span>Made for FWA {identity.dev_mode && <Badge>Development</Badge>}</span>
           </footer>
           <nav class="mobile-dock" aria-label="Quick navigation">

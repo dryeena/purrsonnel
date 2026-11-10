@@ -4,11 +4,12 @@ import { Form, Icon, Modal, Status } from '../../components/ui';
 import { useData } from '../../hooks/use-data';
 import { date } from '../../lib/date';
 import { refresh } from '../../lib/events';
+import { uuid } from '../../lib/uuid';
 import { api } from '../../services/api-client';
 import type { Row } from '../../types/api';
 
 export function Finalize({ application, onClose }: { application: Row; onClose: () => void }) {
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(uuid);
   const { data } = useData<Row[]>('/interviews?page_size=100');
   const [saved, setSaved] = useState<Row | null>(null);
   const interviews = data?.filter((interview) => interview.application_id === application.id);

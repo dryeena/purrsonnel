@@ -27,6 +27,7 @@ export function Terms(_: { path?: string }) {
   const [create, setCreate] = useState(false);
   const [revision, setRevision] = useState<Row | null>(null);
   const [receipt, setReceipt] = useState<Row | null>(null);
+  const [policyFields, setPolicyFields] = useState<Row[]>([]);
   const { data: mine, error, loading } = useData<Row[]>('/terms/applicable');
   const { data: managed } = useData<Row[]>(can(me, 'terms.manage') ? '/terms' : null);
   const { data: compliance } = useData<Row[]>(
@@ -203,7 +204,21 @@ export function Terms(_: { path?: string }) {
           ) : (
             <Form
               fields={[
+                ...(document.fields || []).map((field: Row) => ({
+                  name: field.key,
+                  label: field.label,
+                  type: field.type,
+                  required: field.required,
+                  options: field.options?.map((value: string) => ({ value, label: value })),
+                  maxLength: field.max_length,
+                })),
                 { name: 'typed_name', label: 'Your full name', required: true, maxLength: 200 },
+                {
+                  name: 'signature_svg',
+                  label: 'Draw your signature',
+                  type: 'signature',
+                  required: true,
+                },
                 {
                   name: 'consent',
                   label: 'I have read this exact version and agree to acknowledge it.',
@@ -213,7 +228,16 @@ export function Terms(_: { path?: string }) {
               ]}
               submit="Acknowledge this version"
               onSubmit={async (b) => {
-                setReceipt(await api(`/term-versions/${document.version_id}/sign`, 'POST', b));
+                const answers: Row = {};
+                for (const field of document.fields || []) answers[field.key] = b[field.key];
+                setReceipt(
+                  await api(`/term-versions/${document.version_id}/sign`, 'POST', {
+                    typed_name: b.typed_name,
+                    consent: b.consent,
+                    signature_svg: b.signature_svg,
+                    answers,
+                  }),
+                );
                 setDocument(null);
                 refresh();
               }}
@@ -259,11 +283,86 @@ export function Terms(_: { path?: string }) {
             ]}
             submit="Save draft"
             onSubmit={async (b) => {
-              await api('/terms', 'POST', b);
+              await api('/terms', 'POST', { ...b, fields: policyFields });
               setCreate(false);
+              setPolicyFields([]);
               refresh();
             }}
-          />
+          >
+            <div class="detail-section">
+              <h3>Fillable fields</h3>
+              <p class="muted">These appear at the bottom of the policy before the signature.</p>
+              {policyFields.map((field, index) => (
+                <div class="row-actions" key={field.key}>
+                  <input
+                    aria-label="Field label"
+                    value={field.label}
+                    onInput={(e) =>
+                      setPolicyFields((all) =>
+                        all.map((item, i) =>
+                          i === index ? { ...item, label: e.currentTarget.value } : item,
+                        ),
+                      )
+                    }
+                  />
+                  <select
+                    aria-label="Field type"
+                    value={field.type}
+                    onChange={(e) =>
+                      setPolicyFields((all) =>
+                        all.map((item, i) =>
+                          i === index ? { ...item, type: e.currentTarget.value } : item,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="text">Short answer</option>
+                    <option value="textarea">Long answer</option>
+                    <option value="date">Date</option>
+                    <option value="boolean">Yes / no</option>
+                  </select>
+                  <label class="check-field">
+                    <input
+                      type="checkbox"
+                      checked={field.required}
+                      onChange={(e) =>
+                        setPolicyFields((all) =>
+                          all.map((item, i) =>
+                            i === index ? { ...item, required: e.currentTarget.checked } : item,
+                          ),
+                        )
+                      }
+                    />{' '}
+                    Required
+                  </label>
+                  <button
+                    type="button"
+                    class="text-link"
+                    onClick={() => setPolicyFields((all) => all.filter((_, i) => i !== index))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                class="text-link"
+                onClick={() =>
+                  setPolicyFields((all) => [
+                    ...all,
+                    {
+                      key: `field_${all.length + 1}`,
+                      label: 'New field',
+                      type: 'text',
+                      required: false,
+                    },
+                  ])
+                }
+              >
+                + Add fillable field
+              </button>
+            </div>
+          </Form>
         </Modal>
       )}
       {revision && (

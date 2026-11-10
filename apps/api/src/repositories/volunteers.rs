@@ -12,6 +12,7 @@ pub(super) const CREATE_SELECT_USERS: &str = "SELECT volunteer_eligible AND myfw
 pub(super) const CREATE_SELECT_VOLUNTEER_ENTRIES: &str = "SELECT EXISTS(SELECT 1 FROM volunteer_entries WHERE volunteer_user_id=$1 AND status IN ('draft','submitted','approved') AND started_at<$3 AND ended_at>$2)";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const TRANSITION_SELECT_USERS: &str = "SELECT volunteer_eligible AND myfwa_id IS NOT NULL AND status='active' FROM users WHERE id=$1 FOR SHARE";
+pub(super) const APPROVER_SELECT_USERS: &str = "SELECT status='active' AND personnel_level_id IS NOT NULL FROM users WHERE id=$1";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const TRANSITION_UPDATE_VOLUNTEER_ENTRIES: &str = "UPDATE volunteer_entries SET status=$2,submitted_at=CASE WHEN $2='submitted' THEN now() ELSE submitted_at END,version=version+1,updated_at=now() WHERE id=$1";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
@@ -78,6 +79,7 @@ pub async fn transition_select_users<C: ConnectionTrait, T: TryGetable>(db: &C, 
     let statement = Statement::from_sql_and_values(DbBackend::Postgres, postgres::TRANSITION_SELECT_USERS, vec![p1]);
     db.query_one(statement).await?.ok_or_else(|| DbErr::RecordNotFound("Record not found".into()))?.try_get_by_index(0)
 }
+pub async fn approver_select_users<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>) -> Result<T, DbErr> {let statement=Statement::from_sql_and_values(DbBackend::Postgres,postgres::APPROVER_SELECT_USERS,vec![p1.into()]);db.query_one(statement).await?.ok_or_else(||DbErr::RecordNotFound("Record not found".into()))?.try_get_by_index(0)}
 
 pub async fn transition_select_volunteer_entries<C: ConnectionTrait>(db: &C, p1: impl Into<Value>) -> Result<QueryResult, DbErr> {
     let p1: Value = p1.into();
@@ -227,15 +229,16 @@ pub async fn decide_update_volunteer_approval_tokens_2<C: ConnectionTrait>(db: &
     db.execute(statement).await
 }
 
-pub async fn decide_insert_volunteer_decision_events<C: ConnectionTrait>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>, p4: impl Into<Value>, p5: impl Into<Value>, p6: impl Into<Value>) -> Result<ExecResult, DbErr> {
+pub async fn decide_insert_volunteer_decision_events<C: ConnectionTrait>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>, p4: impl Into<Value>, p5: impl Into<Value>, p6: impl Into<Value>, p7: impl Into<Value>) -> Result<ExecResult, DbErr> {
     let p1: Value = p1.into();
     let p2: Value = p2.into();
     let p3: Value = p3.into();
     let p4: Value = p4.into();
     let p5: Value = p5.into();
     let p6: Value = p6.into();
+    let p7: Value = p7.into();
     let mut query = Query::insert();
-    query.into_table(volunteer_decision_events::Entity).columns([volunteer_decision_events::Column::EntryId, volunteer_decision_events::Column::ActorUserId, volunteer_decision_events::Column::Decision, volunteer_decision_events::Column::Note, volunteer_decision_events::Column::Method, volunteer_decision_events::Column::IdempotencyKey, volunteer_decision_events::Column::TokenHash]).values_panic([Expr::value(p1.clone()).into(), Expr::value(p2.clone()).into(), Expr::value(p3.clone()).into(), Expr::value(p4.clone()).into(), Expr::value("qr").into(), Expr::value(p5.clone()).into(), Expr::value(p6.clone()).into()]);
+    query.into_table(volunteer_decision_events::Entity).columns([volunteer_decision_events::Column::EntryId, volunteer_decision_events::Column::ActorUserId, volunteer_decision_events::Column::Decision, volunteer_decision_events::Column::Note, volunteer_decision_events::Column::Method, volunteer_decision_events::Column::IdempotencyKey, volunteer_decision_events::Column::TokenHash]).values_panic([Expr::value(p1.clone()).into(), Expr::value(p2.clone()).into(), Expr::value(p3.clone()).into(), Expr::value(p4.clone()).into(), Expr::value(p5.clone()).into(), Expr::value(p6.clone()).into(), Expr::value(p7.clone()).into()]);
     let statement = db.get_database_backend().build(&query);
     db.execute(statement).await
 }

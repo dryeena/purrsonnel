@@ -3,9 +3,9 @@ use serde_json::json;
 use chrono::{TimeZone,Utc};
 use uuid::Uuid;
 
-#[test]fn development_requires_explicit_opt_in(){assert!(Config::validate("development",true,"http://localhost:5173").is_ok());assert!(Config::validate("development",false,"http://localhost:5173").is_err());}
-#[test]fn production_and_staging_never_allow_dev_auth(){for env in ["production","staging","test",""]{assert!(Config::validate(env,true,"http://localhost:5173").is_err());assert!(Config::validate(env,false,"http://localhost:5173").is_err());}}
-#[test]fn dev_origins_must_be_loopback(){for origin in ["https://evil.example:5173","http://localhost.evil:5173","http://localhost:5173@evil.com","http://localhost:5173/path","null","http://localhost:"]{assert!(Config::validate("development",true,origin).is_err(),"{origin}");}for origin in ["http://127.0.0.1:5173","https://localhost:5173"]{assert!(Config::validate("development",true,origin).is_ok());}}
+#[test]fn development_requires_explicit_opt_in(){assert!(Config::validate("development",true,"http://localhost:5173",false).is_ok());assert!(Config::validate("development",false,"http://localhost:5173",false).is_err());}
+#[test]fn production_and_staging_never_allow_dev_auth(){for env in ["production","staging","test",""]{assert!(Config::validate(env,true,"http://localhost:5173",false).is_err());assert!(Config::validate(env,false,"http://localhost:5173",false).is_err());}}
+#[test]fn dev_origins_must_be_loopback(){for origin in ["https://evil.example:5173","http://localhost.evil:5173","http://localhost:5173@evil.com","http://localhost:5173/path","null","http://localhost:"]{assert!(Config::validate("development",true,origin,false).is_err(),"{origin}");}for origin in ["http://127.0.0.1:5173","https://localhost:5173"]{assert!(Config::validate("development",true,origin,false).is_ok());}}
 #[test]fn tokens_are_random_and_stored_as_hashes(){let a=token();let b=token();assert_eq!(a.len(),64);assert_ne!(a,b);assert_ne!(hash(&a),a);assert_eq!(hash("hello"),"2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");}
 #[test]fn free_text_is_bounded(){assert!(validation::text("  ",20).is_err());assert!(validation::text("hello",4).is_err());assert!(validation::text("🐈",1).is_ok());}
 #[test]fn denial_requires_explanation(){assert!(validation::decision("deny","").is_err());assert!(validation::decision("deny","Not enough availability").is_ok());assert!(validation::decision("approve","").is_ok());assert!(validation::decision("accept","").is_err());}

@@ -29,7 +29,7 @@ pub fn router(s:AppState)->Router {
  .route("/volunteer/entries",get(volunteers::list).post(volunteers::create))
  .route("/volunteer/entries/{id}",get(detail::entry).patch(lifecycle::edit_entry)).route("/volunteer/entries/{id}/reopen",post(lifecycle::reopen))
  .route("/volunteer/entries/{id}/submit",post(volunteers::submit)).route("/volunteer/entries/{id}/withdraw",post(volunteers::withdraw)).route("/volunteer/entries/{id}/approval-qr",post(volunteers::qr))
- .route("/volunteer/approval-preview",get(volunteers::preview)).route("/volunteer/approval-decisions",post(volunteers::decide)).route("/volunteer/reports/hours",get(volunteers::report))
+ .route("/volunteer/approval-preview",get(volunteers::preview)).route("/volunteer/approval-decisions",post(volunteers::decide)).route("/volunteer/manual-decisions",post(volunteers::decide_manual)).route("/volunteer/reports/hours",get(volunteers::report))
  .route("/positions",get(hiring::positions).post(hiring::create_position)).route("/positions/{id}",get(detail::position).patch(hiring::update_position))
  .route("/positions/{id}/owner",post(lifecycle::owner))
  .route("/default-questions",get(hiring::questions).post(hiring::create_question))

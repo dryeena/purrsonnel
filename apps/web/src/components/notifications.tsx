@@ -3,6 +3,7 @@ import { useState } from 'preact/hooks';
 import { useData } from '../hooks/use-data';
 import { date } from '../lib/date';
 import { refresh } from '../lib/events';
+import { humanize } from '../lib/text';
 import { api } from '../services/api-client';
 import type { Row } from '../types/api';
 
@@ -10,16 +11,17 @@ import { Action, Badge, Empty, Icon, Modal } from './ui';
 export function Notifications() {
   const [open, setOpen] = useState(false);
   const { data, error } = useData<Row[]>('/notifications', 15000);
+  const unread = data?.some((notification) => !notification.read_at) ?? false;
   return (
     <>
       <button
         type="button"
-        class="icon-button"
-        aria-label="Notifications"
+        class={`icon-button notification-button ${unread ? 'has-unread' : ''}`}
+        aria-label={unread ? 'Notifications: unread messages' : 'Notifications'}
         onClick={() => setOpen(true)}
       >
-        <Icon name="bell" />
-        {data?.some((n) => !n.read_at) && <i />}
+        <Icon name="bell" size={21} />
+        {unread && <i />}
       </button>
       {open && (
         <Modal title="Your notifications" onClose={() => setOpen(false)}>
@@ -47,7 +49,7 @@ export function Notifications() {
                               ? 'A request reminder'
                               : n.type === 'request_escalated'
                                 ? 'An unclaimed request needs help'
-                                : n.type.replaceAll('_', ' ')}
+                                : humanize(n.type)}
                     </strong>
                     {!n.read_at && <Badge tone="plum">New</Badge>}
                   </div>

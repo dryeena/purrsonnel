@@ -69,6 +69,7 @@ export function FormField({ field: f, formId }: { field: FieldSpec; formId: stri
         {hints}
       </div>
     );
+  if (f.type === 'signature') return <SignatureField field={f} controlId={controlId} />;
   return (
     <div class="field">
       <label class="field-label" htmlFor={controlId}>
@@ -125,6 +126,52 @@ export function FormField({ field: f, formId }: { field: FieldSpec; formId: stri
         />
       )}
       {hints}
+    </div>
+  );
+}
+
+function SignatureField({ field, controlId }: { field: FieldSpec; controlId: string }) {
+  const [points, setPoints] = useState<string[]>([]);
+  const drawing = useRef(false);
+  const point = (event: PointerEvent) => {
+    const box = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
+    return `${Math.round(((event.clientX - box.left) / box.width) * 600)},${Math.round(((event.clientY - box.top) / box.height) * 160)}`;
+  };
+  const d = points.length ? `M ${points.join(' L ')}` : '';
+  const value = d
+    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160"><path d="${d}" fill="none" stroke="black" stroke-width="3" stroke-linecap="round"/></svg>`
+    : '';
+  return (
+    <div class="field signature-field">
+      <label class="field-label" htmlFor={controlId}>
+        {field.label}
+        {field.required && <b aria-hidden="true"> *</b>}
+      </label>
+      <svg
+        id={controlId}
+        class="signature-pad"
+        viewBox="0 0 600 160"
+        role="img"
+        aria-label="Draw your signature"
+        onPointerDown={(e) => {
+          drawing.current = true;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setPoints([point(e)]);
+        }}
+        onPointerMove={(e) => {
+          if (drawing.current) setPoints((prior) => [...prior, point(e)]);
+        }}
+        onPointerUp={() => {
+          drawing.current = false;
+        }}
+      >
+        <path d={d} fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+      </svg>
+      <input type="hidden" name={field.name} value={value} />
+      <button type="button" class="text-link" onClick={() => setPoints([])}>
+        Clear signature
+      </button>
+      <small class="field-hint">Draw your signature with a mouse, trackpad, or touch.</small>
     </div>
   );
 }

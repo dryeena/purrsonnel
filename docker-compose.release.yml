@@ -30,7 +30,8 @@ services:
       DEV_AUTH_DEFAULT_USER: dev.hr@purrsonnel.local
       DATABASE_URL: postgres://purrsonnel:purrsonnel_dev_only@db:5432/purrsonnel
       API_BIND: 0.0.0.0:3000
-      APP_PUBLIC_ORIGIN: http://localhost:${RELEASE_PORT:-8080}
+      APP_PUBLIC_ORIGIN: http://${RELEASE_PUBLIC_HOST:-localhost}:${RELEASE_PORT:-8080}
+      DEV_AUTH_ALLOW_LAN: ${DEV_AUTH_ALLOW_LAN:-false}
       MAX_VOLUNTEER_MINUTES: ${MAX_VOLUNTEER_MINUTES:-960}
       WEB_PUSH_ENABLED: ${WEB_PUSH_ENABLED:-false}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
@@ -47,7 +48,7 @@ services:
       context: ./apps/web
       target: release
     restart: unless-stopped
-    ports: ["127.0.0.1:${RELEASE_PORT:-8080}:8080"]
+    ports: ["${RELEASE_BIND_HOST:-127.0.0.1}:${RELEASE_PORT:-8080}:8080"]
     depends_on:
       api: {condition: service_healthy}
     security_opt: ["no-new-privileges:true"]

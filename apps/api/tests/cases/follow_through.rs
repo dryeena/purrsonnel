@@ -95,7 +95,7 @@ async fn policy_suppresses_phone_jobs_but_preserves_notifications(db:PgPool){
  let h=Harness::new(db).await;let hr=h.login().await;let id=request(&h,&hr).await;let staff=h.id("staff").await;
  sqlx::query("INSERT INTO notification_preferences(user_id,request_alerts) VALUES($1,'off')").bind(staff).execute(&h.db).await.unwrap();
  sqlx::query("INSERT INTO push_subscriptions(user_id,endpoint_hash,endpoint,p256dh,auth) VALUES($1,'fixture','https://fcm.googleapis.com/test','fixture','fixture')").bind(staff).execute(&h.db).await.unwrap();
- let mut tx=h.db.begin().await.unwrap();assert_eq!(notify(&mut tx,true,staff,id,"request_reminder","urgent").await.unwrap(),(0,1));tx.commit().await.unwrap();
+ let db=sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(h.db.clone());let mut tx=sea_orm::TransactionTrait::begin(&db).await.unwrap();assert_eq!(notify(&mut tx,true,staff,id,"request_reminder","urgent").await.unwrap(),(0,1));tx.commit().await.unwrap();
  let count:i64=sqlx::query_scalar("SELECT count(*) FROM notifications WHERE type='request_reminder'").fetch_one(&h.db).await.unwrap();assert_eq!(count,1);
  let staff_session=h.switch(&hr,"staff").await;assert_eq!(h.request("PUT","/notification-preferences",Some(&staff_session),prefs("all")).await.0,StatusCode::OK);
  let status:String=sqlx::query_scalar("SELECT status FROM push_deliveries LIMIT 1").fetch_one(&h.db).await.unwrap();assert_eq!(status,"suppressed");
@@ -116,7 +116,7 @@ async fn quiet_hours_defer_jobs_without_consuming_attempts_and_preference_change
  let h=Harness::new(db).await;let hr=h.login().await;let id=request(&h,&hr).await;let staff=h.id("staff").await;
  sqlx::query("INSERT INTO notification_preferences(user_id,quiet_enabled,timezone,quiet_start,quiet_end) SELECT $1,true,'UTC',((extract(hour FROM now() AT TIME ZONE 'UTC')::int*60+extract(minute FROM now() AT TIME ZONE 'UTC')::int+1439)%1440)::smallint,((extract(hour FROM now() AT TIME ZONE 'UTC')::int*60+extract(minute FROM now() AT TIME ZONE 'UTC')::int+120)%1440)::smallint").bind(staff).execute(&h.db).await.unwrap();
  sqlx::query("INSERT INTO push_subscriptions(user_id,endpoint_hash,endpoint,p256dh,auth) VALUES($1,'fixture','https://fcm.googleapis.com/test','fixture','fixture')").bind(staff).execute(&h.db).await.unwrap();
- let mut tx=h.db.begin().await.unwrap();assert_eq!(notify(&mut tx,true,staff,id,"request_reminder","urgent").await.unwrap(),(1,0));tx.commit().await.unwrap();
+ let db=sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(h.db.clone());let mut tx=sea_orm::TransactionTrait::begin(&db).await.unwrap();assert_eq!(notify(&mut tx,true,staff,id,"request_reminder","urgent").await.unwrap(),(1,0));tx.commit().await.unwrap();
  let delayed:bool=sqlx::query_scalar("SELECT next_attempt_at>now() AND attempts=0 AND status='pending' AND last_error='quiet_hours' FROM push_deliveries LIMIT 1").fetch_one(&h.db).await.unwrap();assert!(delayed);
  let staff_session=h.switch(&hr,"staff").await;assert_eq!(h.request("PUT","/notification-preferences",Some(&staff_session),prefs("all")).await.0,StatusCode::OK);
  let awake:bool=sqlx::query_scalar("SELECT next_attempt_at<=now() AND attempts=0 AND status='pending' FROM push_deliveries LIMIT 1").fetch_one(&h.db).await.unwrap();assert!(awake);

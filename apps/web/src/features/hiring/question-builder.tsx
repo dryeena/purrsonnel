@@ -1,6 +1,8 @@
 import { useState } from 'preact/hooks';
 
 import { Icon } from '../../components/ui';
+import { humanize } from '../../lib/text';
+import { uuid } from '../../lib/uuid';
 import type { Row } from '../../types/api';
 
 export function QuestionBuilder({
@@ -72,7 +74,7 @@ export function QuestionBuilder({
               'url',
             ].map((v) => (
               <option key={v} value={v}>
-                {v.replace('_', ' ')}
+                {humanize(v)}
               </option>
             ))}
           </select>
@@ -100,7 +102,7 @@ export function QuestionBuilder({
           setQuestions([
             ...questions,
             {
-              key: `custom_${crypto.randomUUID().replaceAll('-', '')}`,
+              key: `custom_${uuid().replaceAll('-', '')}`,
               label,
               type,
               required,

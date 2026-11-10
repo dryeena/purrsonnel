@@ -29,8 +29,10 @@ pub async fn update(State(s):State<AppState>,p:Principal,Path(id):Path<Uuid>,Jso
  crate::repositories::people::update_select_policy(&tx).await?; // serialize graph writes
  crate::repositories::people::update_select_users(&tx, (id).to_owned()).await?;
  let before:Value=crate::repositories::people::update_select_people_directory(&tx, (id).to_owned()).await?;
+ if b.volunteer_eligible==Some(true)&&!before["personnel_level_id"].is_null(){return Err(ApiError::bad("Staff and volunteer roles are separate; convert the person instead of enabling volunteer status"));}
  if b.status.as_deref()==Some("active")&&before["status"]=="pending_identity"&&before["myfwa_id"].is_null(){return Err(ApiError::bad("Verify and link the external identity before activating this profile"));}
- crate::repositories::people::update_update_users(&tx, (id).to_owned(), (b.display_name).to_owned(), (b.status).to_owned(), (b.volunteer_eligible).to_owned(), (b.personnel_level_id).to_owned()).await?;
+ let volunteer_eligible=if b.personnel_level_id.is_some(){Some(false)}else{b.volunteer_eligible};
+ crate::repositories::people::update_update_users(&tx, (id).to_owned(), (b.display_name).to_owned(), (b.status).to_owned(), volunteer_eligible, (b.personnel_level_id).to_owned()).await?;
  if let Some(deps)=b.department_ids {
   if deps.len()>20||b.primary_department_id.is_some_and(|d|!deps.contains(&d)){return Err(ApiError::bad("Primary department must be an active membership"));}
   crate::repositories::people::update_update_user_departments(&tx, (id).to_owned()).await?;

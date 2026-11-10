@@ -2,6 +2,7 @@ import { Badge, ErrorBox, Form, Modal } from '../../components/ui';
 import { useData } from '../../hooks/use-data';
 import { date } from '../../lib/date';
 import { refresh } from '../../lib/events';
+import { humanize } from '../../lib/text';
 import { api } from '../../services/api-client';
 import type { Row } from '../../types/api';
 
@@ -19,7 +20,7 @@ export function Notes({ interview, onClose }: { interview: Row; onClose: () => v
           <article key={note.id}>
             <div>
               <strong>{note.author_name}</strong>
-              <Badge>{note.visibility.replace('_', ' ')}</Badge>
+              <Badge>{humanize(note.visibility)}</Badge>
             </div>
             <p>{note.body}</p>
             <small>{date(note.created_at, true)}</small>

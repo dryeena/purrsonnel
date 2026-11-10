@@ -32,7 +32,7 @@ export function Dashboard(_: { path?: string }) {
   return (
     <>
       <PageHead
-        eyebrow="A LITTLE MORE ORGANIZED. A LOT MORE TOGETHER."
+        eyebrow="PEOPLE MAKE THE MAGIC HAPPEN."
         title={`Hello, ${identity.user.display_name.split(' ')[0]}.`}
         description={
           hr
@@ -71,7 +71,7 @@ export function Dashboard(_: { path?: string }) {
             src="/branding/purrsonnel-logo.png"
             alt="Purrsonnel cat peeking over a personnel ID badge"
           />
-          <span class="art-caption">a place for every paw.</span>
+          <span class="art-caption">People make the magic happen.</span>
         </div>
       </section>
       <div class="stats-grid">

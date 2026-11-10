@@ -3,6 +3,7 @@ import { useState } from 'preact/hooks';
 import { Badge, Empty, ErrorBox, Loading, PageHead, Panel } from '../../components/ui';
 import { useData } from '../../hooks/use-data';
 import { date } from '../../lib/date';
+import { humanize } from '../../lib/text';
 import type { Row } from '../../types/api';
 
 export function Audit(_: { path?: string }) {
@@ -41,7 +42,7 @@ export function Audit(_: { path?: string }) {
                       <Badge>{e.action}</Badge>
                     </td>
                     <td>
-                      <span>{e.resource_type.replaceAll('_', ' ')}</span>
+                      <span>{humanize(e.resource_type)}</span>
                       <small class="mono muted">{e.resource_id?.slice(0, 8) || '—'}</small>
                     </td>
                     <td>

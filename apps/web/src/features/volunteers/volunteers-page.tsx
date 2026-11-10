@@ -16,20 +16,21 @@ import { useData } from '../../hooks/use-data';
 import { useAuth } from '../../lib/auth';
 import { date } from '../../lib/date';
 import { refresh } from '../../lib/events';
-import { can } from '../../lib/permissions';
 import { api } from '../../services/api-client';
 import type { Row } from '../../types/api';
 import { VolunteerControls } from '../lifecycle';
 
 import { Scanner } from './approval-scanner';
+import { ManualApproval } from './manual-approval';
 import { QrModal } from './qr-dialog';
 
 export function Volunteers(_: { path?: string }) {
   const me = useAuth();
   const [newEntry, setNewEntry] = useState(false);
   const [qr, setQr] = useState<Row | null>(null);
+  const [manualEntry, setManualEntry] = useState<Row | null>(null);
   const [scan, setScan] = useState(location.pathname.endsWith('/approve'));
-  const [tab, setTab] = useState('entries');
+  const [tab, setTab] = useState(new URLSearchParams(location.search).get('tab') || 'entries');
   const [timeMode, setTimeMode] = useState(false);
   const {
     data: entries,
@@ -38,7 +39,7 @@ export function Volunteers(_: { path?: string }) {
   } = useData<Row[]>('/volunteer/entries?page_size=100', 15000);
   const { data: org } = useData<Row>('/organization/tree');
   const { data: report } = useData<Row[]>('/volunteer/reports/hours');
-  const approve = can(me, 'volunteer.time.approve');
+  const approve = !!me.user.personnel_level_id;
   const rows =
     tab === 'mine' ? entries?.filter((e) => e.volunteer_user_id === me.user.id) : entries;
   const minutes =
@@ -204,9 +205,11 @@ export function Volunteers(_: { path?: string }) {
                               Withdraw
                             </Action>
                           )}
-                        {e.volunteer_user_id !== me.user.id && e.status === 'submitted' && (
-                          <span class="muted">Ask volunteer for QR</span>
-                        )}
+                        {approve &&
+                          e.volunteer_user_id !== me.user.id &&
+                          e.status === 'submitted' && (
+                            <Action action={async () => setManualEntry(e)}>Review manually</Action>
+                          )}
                       </div>
                     </td>
                   </tr>
@@ -305,6 +308,7 @@ export function Volunteers(_: { path?: string }) {
         </Modal>
       )}
       {qr && <QrModal data={qr} onClose={() => setQr(null)} />}{' '}
+      {manualEntry && <ManualApproval entry={manualEntry} onClose={() => setManualEntry(null)} />}{' '}
       {scan && <Scanner onClose={() => setScan(false)} />}
     </>
   );

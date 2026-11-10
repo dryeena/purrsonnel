@@ -11,6 +11,7 @@ pub struct Model {
     pub version_number: i32,
     pub body_markdown: String,
     pub body_sha256: String,
+    pub form_schema_json: Json,
     pub published_at: Option<chrono::DateTime<chrono::Utc>>,
     pub published_by: Option<Uuid>,
     pub superseded_at: Option<chrono::DateTime<chrono::Utc>>,

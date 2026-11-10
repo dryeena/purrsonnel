@@ -26,7 +26,11 @@ pub fn validate_create(b:&Create)->Result<()> {
  if !["normal","urgent"].contains(&b.urgency.as_str()){return Err(ApiError::bad("Choose normal or urgent priority"));}
  Ok(())
 }
-#[derive(Deserialize)]pub struct RequestPage{#[serde(flatten)]pub page:Page,pub view:Option<String>,pub status:Option<String>,pub q:Option<String>}
+#[derive(Deserialize)]pub struct RequestPage{pub page:Option<String>,pub page_size:Option<String>,pub view:Option<String>,pub status:Option<String>,pub q:Option<String>}
+impl RequestPage {fn pagination(&self)->Result<Page>{
+ let parse=|value:&Option<String>,name:&str|value.as_deref().map(|raw|raw.parse::<i64>().map_err(|_|ApiError::bad(format!("{name} must be a whole number")))).transpose();
+ Ok(Page{page:parse(&self.page,"page")?,page_size:parse(&self.page_size,"page_size")?})
+}}
 pub async fn create(State(s):State<AppState>,p:Principal,Json(b):Json<Create>)->Result<Json<Value>> {
  validate_create(&b)?;
  if let Some(dept)=b.recipient_department_id{p.require(&s,"requests.send",Some(dept)).await?;}
@@ -60,7 +64,7 @@ pub async fn create(State(s):State<AppState>,p:Principal,Json(b):Json<Create>)->
 }
 
 pub async fn list(State(s):State<AppState>,p:Principal,Query(query):Query<RequestPage>)->Result<Json<Value>> {
- let view=query.view.as_deref().unwrap_or("all");if !["all","inbox","sent"].contains(&view){return Err(ApiError::bad("Unknown inbox view"));}let page=query.page;
+ let view=query.view.as_deref().unwrap_or("all");if !["all","inbox","sent"].contains(&view){return Err(ApiError::bad("Unknown inbox view"));}let page=query.pagination()?;
  let status=query.status.as_deref().unwrap_or("all");if !["all","active","open","accepted","completed","cancelled"].contains(&status){return Err(ApiError::bad("Unknown request status"));}
  let search=query.q.as_deref().unwrap_or("").trim();if search.chars().count()>160{return Err(ApiError::bad("Search must be 160 characters or fewer"));}
  let search_pattern=format!("%{}%",search.replace('\\',"\\\\").replace('%',"\\%").replace('_',"\\_"));

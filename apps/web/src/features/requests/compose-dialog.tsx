@@ -2,13 +2,14 @@ import { useState } from 'preact/hooks';
 
 import { Empty, ErrorBox, Form, Loading, Modal } from '../../components/ui';
 import { useData } from '../../hooks/use-data';
+import { uuid } from '../../lib/uuid';
 import { api } from '../../services/api-client';
 import type { Row } from '../../types/api';
 
 export function Compose({ onClose, onSent }: { onClose: () => void; onSent: (r: Row) => void }) {
   const { data, error, loading } = useData<Row>('/requests/recipients');
   const [kind, setKind] = useState('team');
-  const [key] = useState(() => crypto.randomUUID());
+  const [key] = useState(uuid);
   const options =
     kind === 'team'
       ? data?.departments

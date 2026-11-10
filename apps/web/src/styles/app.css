@@ -524,11 +524,49 @@ main:focus {
   position: absolute;
   top: 5px;
   right: 7px;
-  width: 5px;
-  height: 5px;
+  width: 10px;
+  height: 10px;
   background: #9975a9;
   border: 1px solid #fff;
   border-radius: 50%;
+}
+.notification-button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.notification-button.has-unread {
+  color: var(--plum);
+  background: #f7f0fa;
+}
+.notification-button.has-unread svg {
+  animation: notification-ring 1.6s ease-in-out infinite;
+  transform-origin: top center;
+}
+@keyframes notification-ring {
+  0%,
+  62%,
+  100% {
+    transform: rotate(0);
+  }
+  70% {
+    transform: rotate(10deg);
+  }
+  78% {
+    transform: rotate(-10deg);
+  }
+  86% {
+    transform: rotate(6deg);
+  }
+  94% {
+    transform: rotate(-4deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notification-button.has-unread svg {
+    animation: none;
+  }
 }
 .topbar-avatar {
   padding-left: 18px;
@@ -3121,4 +3159,17 @@ th,
   .sidebar .workspace {
     margin-bottom: 17px;
   }
+}
+.signature-pad {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  height: 160px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  touch-action: none;
+}
+.signature-field .text-link {
+  margin-top: 6px;
 }

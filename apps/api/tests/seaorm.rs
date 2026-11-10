@@ -1,6 +1,6 @@
 //! The application uses SeaORM. SQLx here only creates disposable PostgreSQL databases.
 use purrsonnel_api::{entities::skills,migrations,repositories::directory};
-use sea_orm::{ActiveModelTrait,DbBackend,EntityTrait,QueryTrait,Set,TransactionTrait};
+use sea_orm::{ActiveModelTrait,ConnectionTrait,DbBackend,EntityTrait,QueryTrait,Set,TransactionTrait};
 use sea_orm_migration::MigratorTrait;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -27,7 +27,9 @@ fn seaorm_errors_do_not_expose_query_values_to_api_clients(){
 async fn seaorm_migrations_bootstrap_once_and_register_all_versions(db:PgPool){
  let orm=sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(db);
  migrations::up(&orm).await.unwrap();migrations::up(&orm).await.unwrap();
- assert_eq!(migrations::Migrator::get_applied_migrations(&orm).await.unwrap().len(),5);
+ assert_eq!(migrations::Migrator::get_applied_migrations(&orm).await.unwrap().len(),6);
+ let columns=orm.query_all(sea_orm::Statement::from_string(DbBackend::Postgres,"SELECT column_name FROM information_schema.columns WHERE table_name='term_versions'")).await.unwrap();
+ assert!(columns.iter().any(|row|row.try_get::<String>("","column_name").unwrap()=="form_schema_json"));
  assert_eq!(skills::Entity::find().all(&orm).await.unwrap().len(),0);
 }
 #[sqlx::test(migrations=false)]
