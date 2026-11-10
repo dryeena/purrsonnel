@@ -11,6 +11,7 @@ import { Dashboard } from './features/dashboard';
 import { Applications, Interviews, Positions } from './features/hiring';
 import { People } from './features/people';
 import { Requests } from './features/requests';
+import { Schedules } from './features/schedules';
 import { Terms } from './features/terms';
 import { Volunteers } from './features/volunteers';
 import { AuthContext } from './lib/auth';
@@ -32,6 +33,7 @@ const nav = [
   { label: 'Positions', path: '/positions', icon: 'briefcase' },
   { label: 'Applications', path: '/applications', icon: 'terms' },
   { label: 'Interviews', path: '/interviews', icon: 'calendar' },
+  { label: 'Schedules', path: '/schedules', icon: 'calendar' },
   { label: 'Lists & bulk actions', path: '/lists', icon: 'list', permission: 'people.bulk_update' },
   { label: 'Settings', path: '/settings', icon: 'settings', permission: 'settings.manage' },
   { label: 'Audit log', path: '/audit', icon: 'audit', permission: 'audit.read' },
@@ -320,6 +322,7 @@ export function App() {
               <Positions path="/positions" />
               <Applications path="/applications" />
               <Interviews path="/interviews" />
+              <Schedules path="/schedules" />
               <Lists path="/lists" />
               <Settings path="/settings" />
               <Audit path="/audit" />

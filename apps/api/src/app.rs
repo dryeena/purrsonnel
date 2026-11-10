@@ -1,6 +1,6 @@
 use axum::{routing::{get,post,put},Router,http::{HeaderValue,header}};
 
-use crate::{AppState,auth,features::{people,organization,terms,volunteers,hiring,lists,dashboard,configuration,lifecycle,notifications,detail,requests,push,alert_preferences,request_follow_up}};
+use crate::{AppState,auth,features::{people,organization,terms,volunteers,hiring,lists,dashboard,configuration,lifecycle,notifications,detail,requests,push,alert_preferences,request_follow_up,schedules}};
 pub fn router(s:AppState)->Router {
  let mut api=Router::new()
  .route("/auth/me",get(auth::me)).route("/auth/logout",post(auth::logout))
@@ -19,6 +19,7 @@ pub fn router(s:AppState)->Router {
  .route("/skills",get(people::skills).post(people::create_skill))
  .route("/organization/tree",get(organization::tree)).route("/departments",get(detail::departments).post(organization::create_department)).route("/divisions",get(detail::divisions).post(organization::create_division))
  .route("/events",get(organization::events).post(organization::create_event)).route("/events/{id}",axum::routing::patch(organization::update_event))
+ .route("/schedules",get(schedules::list).post(schedules::create)).route("/schedules/{id}/claim",post(schedules::claim))
  .route("/departments/{id}",get(detail::department).patch(lifecycle::department)).route("/divisions/{id}",axum::routing::patch(lifecycle::division))
  .route("/departments/{id}/members",get(lifecycle::members)).route("/departments/{id}/members/{user}",axum::routing::patch(lifecycle::member_activity))
  .route("/profile-fields",get(organization::fields).post(organization::create_field))

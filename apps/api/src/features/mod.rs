@@ -13,6 +13,7 @@ pub mod requests;
 pub mod push;
 pub mod alert_preferences;
 pub mod request_follow_up;
+pub mod schedules;
 use crate::error::Result;
 use serde_json::Value;
 use sea_orm::{DatabaseTransaction, TransactionTrait};
