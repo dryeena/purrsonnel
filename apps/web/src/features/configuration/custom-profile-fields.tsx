@@ -27,7 +27,18 @@ export function CustomProfileFields({ personId }: { personId: string }) {
   }));
   return (
     <div class="detail-section">
-      <h3>Organization profile fields</h3>
+      <div class="detail-section-heading">
+        <h3>Organization profile fields</h3>
+        {editable.length > 0 && (
+          <button
+            type="button"
+            class="button secondary small-button"
+            onClick={() => setOpen(!open)}
+          >
+            {open ? 'Close editor' : 'Edit profile fields'}
+          </button>
+        )}
+      </div>
       <div class="detail-grid">
         {data.map((f) => (
           <div key={f.id}>
@@ -36,11 +47,6 @@ export function CustomProfileFields({ personId }: { personId: string }) {
           </div>
         ))}
       </div>
-      {editable.length > 0 && (
-        <button type="button" class="text-link" onClick={() => setOpen(!open)}>
-          Edit profile fields
-        </button>
-      )}
       {open && (
         <Form
           fields={fields}

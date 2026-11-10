@@ -16,7 +16,12 @@ export function Applications(_: { path?: string }) {
   const [detail, setDetail] = useState<string | null>(null);
   const [final, setFinal] = useState<Row | null>(null);
   const [status, setStatus] = useState('');
-  const rows = data?.filter((a) => !status || a.status === status);
+  const inProgress = new URLSearchParams(location.search).get('in_progress') === '1';
+  const rows = data?.filter(
+    (a) =>
+      (!status || a.status === status) &&
+      (!inProgress || ['submitted', 'screening', 'interviewing'].includes(a.status)),
+  );
   return (
     <>
       <PageHead
@@ -51,6 +56,7 @@ export function Applications(_: { path?: string }) {
             ))}
           </select>
           <span class="result-count">{rows?.length || 0} applications</span>
+          {inProgress && <span class="result-count">In progress</span>}
         </div>
         {error ? (
           <ErrorBox message={error} />

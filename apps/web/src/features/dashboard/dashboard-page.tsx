@@ -98,7 +98,7 @@ export function Dashboard(_: { path?: string }) {
                 value: c.applications,
                 icon: 'briefcase',
                 note: 'Find your next great teammate',
-                href: '/applications',
+                href: '/applications?in_progress=1',
                 tone: 'blue',
               },
               {
@@ -132,7 +132,7 @@ export function Dashboard(_: { path?: string }) {
                 value: c.applications,
                 icon: 'briefcase',
                 note: 'Your next chapter starts here',
-                href: '/applications',
+                href: '/applications?in_progress=1',
                 tone: 'blue',
               },
               {
@@ -197,7 +197,7 @@ export function Dashboard(_: { path?: string }) {
                       ? 'Thoughtful people are ready to join your team.'
                       : 'Follow along with your next opportunity.'
                   }
-                  href="/applications"
+                  href="/applications?in_progress=1"
                   tone="blue"
                 />
               )}

@@ -1752,6 +1752,15 @@ tbody tr:hover {
   color: #926a9e;
   margin-bottom: 12px;
 }
+.detail-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.detail-section-heading h3 {
+  margin: 0;
+}
 .detail-section p {
   font-size: 11px;
   margin-bottom: 14px;
