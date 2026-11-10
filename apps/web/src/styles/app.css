@@ -1764,6 +1764,21 @@ tbody tr:hover {
 .setting-list > .event-edition-completed {
   opacity: 0.52;
 }
+.table-sort {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+.table-sort:hover,
+.table-sort:focus-visible {
+  color: var(--plum, #6d3c75);
+}
 .detail-section p {
   font-size: 11px;
   margin-bottom: 14px;

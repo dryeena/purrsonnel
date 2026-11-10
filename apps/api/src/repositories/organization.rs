@@ -103,8 +103,11 @@ pub async fn fields_select_profile_field_definitions<C: ConnectionTrait, T: TryG
     let statement = db.get_database_backend().build(&query);
     db.query_all(statement).await?.into_iter().map(|row| row.try_get_by_index(0)).collect()
 }
+pub async fn people_page_fields_select_profile_field_definitions<C: ConnectionTrait, T: TryGetable>(db: &C) -> Result<Vec<T>, DbErr> {
+ let mut query=Query::select();query.from(profile_field_definitions::Entity);query.expr(Func::cust(Alias::new("to_jsonb")).arg(Expr::col(Alias::new("profile_field_definitions"))));query.cond_where(Condition::all().add(Expr::col(profile_field_definitions::Column::Active).eq(true)).add(Expr::col(profile_field_definitions::Column::ShowOnPeoplePage).eq(true)));query.order_by(profile_field_definitions::Column::DisplayOrder,Order::Asc);query.order_by(profile_field_definitions::Column::Label,Order::Asc);db.query_all(db.get_database_backend().build(&query)).await?.into_iter().map(|row|row.try_get_by_index(0)).collect()
+}
 
-pub async fn create_field_insert_profile_field_definitions<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>, p4: impl Into<Value>, p5: impl Into<Value>, p6: impl Into<Value>, p7: impl Into<Value>) -> Result<T, DbErr> {
+pub async fn create_field_insert_profile_field_definitions<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>, p4: impl Into<Value>, p5: impl Into<Value>, p6: impl Into<Value>, p7: impl Into<Value>, p8: impl Into<Value>) -> Result<T, DbErr> {
     let p1: Value = p1.into();
     let p2: Value = p2.into();
     let p3: Value = p3.into();
@@ -112,8 +115,9 @@ pub async fn create_field_insert_profile_field_definitions<C: ConnectionTrait, T
     let p5: Value = p5.into();
     let p6: Value = p6.into();
     let p7: Value = p7.into();
+    let p8: Value = p8.into();
     let mut query = Query::insert();
-    query.into_table(profile_field_definitions::Entity).columns([profile_field_definitions::Column::Key, profile_field_definitions::Column::Label, profile_field_definitions::Column::Type, profile_field_definitions::Column::ChoicesJson, profile_field_definitions::Column::Visibility, profile_field_definitions::Column::EditableBy, profile_field_definitions::Column::ValidationJson]).values_panic([Expr::value(p1.clone()).into(), Expr::value(p2.clone()).into(), Expr::value(p3.clone()).into(), Expr::value(p4.clone()).into(), Expr::value(p5.clone()).into(), Expr::value(p6.clone()).into(), Expr::value(p7.clone()).into()]);
+    query.into_table(profile_field_definitions::Entity).columns([profile_field_definitions::Column::Key, profile_field_definitions::Column::Label, profile_field_definitions::Column::Type, profile_field_definitions::Column::ChoicesJson, profile_field_definitions::Column::Visibility, profile_field_definitions::Column::EditableBy, profile_field_definitions::Column::ValidationJson, profile_field_definitions::Column::ShowOnPeoplePage]).values_panic([Expr::value(p1.clone()).into(), Expr::value(p2.clone()).into(), Expr::value(p3.clone()).into(), Expr::value(p4.clone()).into(), Expr::value(p5.clone()).into(), Expr::value(p6.clone()).into(), Expr::value(p7.clone()).into(), Expr::value(p8.clone()).into()]);
     query.returning(Query::returning().column(profile_field_definitions::Column::Id));
     let statement = db.get_database_backend().build(&query);
     db.query_one(statement).await?.ok_or_else(|| DbErr::RecordNotFound("Record not found".into()))?.try_get_by_index(0)

@@ -94,6 +94,14 @@ impl Harness{
  values[field["id"].as_str().unwrap()]=json!("This is too long for the defined field");assert_eq!(h.request("PATCH",&format!("/users/{user}/profile-fields"),Some(&v),json!({"values":values})).await.0,StatusCode::BAD_REQUEST);
  let other=h.id("volunteer2").await;assert_eq!(h.request("PATCH",&format!("/users/{other}/profile-fields"),Some(&v),json!({"values":{}})).await.0,StatusCode::FORBIDDEN);
 }
+#[sqlx::test(migrations="./migrations")]async fn people_page_profile_fields_are_searchable_and_personnel_visible(db:PgPool){
+ let h=Harness::new(db).await;let hr=h.login().await;let sys=h.switch(&hr,"sys").await;
+ assert_eq!(h.request("POST","/profile-fields",Some(&sys),json!({"key":"nickname","label":"Nickname","type":"text","visibility":"self","editable_by":"self","show_on_people_page":true})).await.0,StatusCode::BAD_REQUEST);
+ let(status,field,_)=h.request("POST","/profile-fields",Some(&sys),json!({"key":"nickname","label":"Nickname","type":"text","visibility":"personnel","editable_by":"self","show_on_people_page":true})).await;assert_eq!(status,StatusCode::OK,"{field}");
+ let volunteer=h.switch(&sys,"volunteer").await;let id=h.id("volunteer").await;assert_eq!(h.request("PATCH",&format!("/users/{id}/profile-fields"),Some(&volunteer),json!({"values":{field["id"].as_str().unwrap():"Maple"}})).await.0,StatusCode::OK);
+ let hr=h.login().await;let(_,fields,_)=h.request("GET","/people-page-fields",Some(&hr),Value::Null).await;assert!(fields.as_array().unwrap().iter().any(|f|f["key"]=="nickname"));
+ let(_,people,_)=h.request("GET","/users?q=Maple",Some(&hr),Value::Null).await;let person=people["items"].as_array().unwrap().iter().find(|p|p["id"]==id.to_string()).unwrap();assert_eq!(person["profile_fields"]["nickname"],"Maple");
+}
 #[sqlx::test(migrations="./migrations")]async fn notification_read_is_recipient_only(db:PgPool){
  let h=Harness::new(db).await;let hr=h.login().await;let user=h.id("volunteer").await;let id:Uuid=sqlx::query_scalar("INSERT INTO notifications(recipient_user_id,type,payload_json) VALUES($1,'application_decision','{\"status\":\"approved\"}') RETURNING id").bind(user).fetch_one(&h.db).await.unwrap();
  assert_eq!(h.request("POST",&format!("/notifications/{id}/read"),Some(&hr),json!({})).await.0,StatusCode::NOT_FOUND);let v=h.switch(&hr,"volunteer").await;for _ in 0..2{assert_eq!(h.request("POST",&format!("/notifications/{id}/read"),Some(&v),json!({})).await.0,StatusCode::OK);}

@@ -17,6 +17,7 @@ pub struct Model {
     pub required_for: serde_json::Value,
     pub display_order: i32,
     pub active: bool,
+    pub show_on_people_page: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

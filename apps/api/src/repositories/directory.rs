@@ -16,7 +16,8 @@ pub fn select(actor:Uuid,f:&Filter)->Select<d::Entity>{
  let mut find=d::Entity::find().filter(Condition::any().add(d::Column::Id.eq(actor)).add(Expr::expr(scope).eq(true)));
  if let Some(text)=&f.q{
   let pattern=format!("%{}%",text.replace('\\',"\\\\").replace('%',"\\%").replace('_',"\\_"));
-  find=find.filter(Condition::any().add(Expr::col(d::Column::DisplayName).ilike(pattern.clone())).add(Expr::col(d::Column::MyfwaId).ilike(pattern)));
+  let custom=Expr::cust_with_values("EXISTS(SELECT 1 FROM profile_field_values pfv JOIN profile_field_definitions pfd ON pfd.id=pfv.definition_id WHERE pfv.user_id=people_directory.id AND pfd.active AND pfd.show_on_people_page AND pfv.value_json::text ILIKE $1)",[pattern.clone()]);
+  find=find.filter(Condition::any().add(Expr::col(d::Column::DisplayName).ilike(pattern.clone())).add(Expr::col(d::Column::MyfwaId).ilike(pattern)).add(custom));
  }
  if let Some(id)=f.department{find=find.filter(d::Column::Id.in_subquery(Query::select().column(m::Column::UserId).from(m::Entity).and_where(m::Column::EndedAt.is_null()).and_where(m::Column::DepartmentId.eq(id)).to_owned()));}
  if let Some(id)=f.division{find=find.filter(d::Column::Id.in_subquery(Query::select().column(m::Column::UserId).from(m::Entity).join(JoinType::InnerJoin,dep::Entity,Expr::col((m::Entity,m::Column::DepartmentId)).equals((dep::Entity,dep::Column::Id))).and_where(m::Column::EndedAt.is_null()).and_where(dep::Column::DivisionId.eq(id)).to_owned()));}
@@ -32,7 +33,7 @@ pub fn select(actor:Uuid,f:&Filter)->Select<d::Entity>{
   let outstanding=Query::select().expr(Expr::value(1)).from(v::Entity).and_where(v::Column::PublishedAt.is_not_null()).and_where(v::Column::SupersededAt.is_null()).and_where(Expr::expr(applicable).eq(true)).and_where(Expr::expr(Expr::exists(signed)).not()).to_owned();
   let condition:SimpleExpr=Expr::exists(outstanding);find=find.filter(if pending{condition}else{Expr::expr(condition).not()});
  }
- let column=match f.sort.as_deref(){Some("verified_years")=>d::Column::VerifiedYears,Some("department")=>d::Column::Department,Some("status")=>d::Column::Status,_=>d::Column::DisplayName};
+ let column=match f.sort.as_deref(){Some("verified_years")=>d::Column::VerifiedYears,Some("department")=>d::Column::Department,Some("level")=>d::Column::Level,Some("status")=>d::Column::Status,_=>d::Column::DisplayName};
  find.order_by(column,if f.order.as_deref()==Some("desc"){Order::Desc}else{Order::Asc}).order_by_asc(d::Column::Id)
 }
 pub async fn list<C:ConnectionTrait>(db:&C,actor:Uuid,f:&Filter)->Result<(Vec<serde_json::Value>,u64),DbErr>{

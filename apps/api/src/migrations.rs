@@ -21,6 +21,7 @@ impl MigratorTrait for Migrator {
    Box::new(SqlMigration{name:"m20261109_000004_requests_push",sql:include_str!("../migrations/0004_requests_push.sql")}),
    Box::new(SqlMigration{name:"m20261109_000005_follow_through",sql:include_str!("../migrations/0005_request_follow_through.sql")}),
    Box::new(SqlMigration{name:"m20261110_000006_policy_fields_and_signatures",sql:include_str!("../migrations/0006_policy_fields_and_signatures.sql")}),
+   Box::new(SqlMigration{name:"m20261110_000007_people_page_profile_fields",sql:include_str!("../migrations/0007_people_page_profile_fields.sql")}),
   ]
  }
 }

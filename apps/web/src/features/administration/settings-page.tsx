@@ -215,6 +215,12 @@ export function Settings(_: { path?: string }) {
                             ],
                           },
                           {
+                            name: 'show_on_people_page',
+                            label: 'Show as a column on the People page',
+                            type: 'checkbox',
+                            help: 'Visible fields can be searched from the People directory.',
+                          },
+                          {
                             name: 'choices_text',
                             label: 'Dropdown choices (one per line)',
                             type: 'textarea',

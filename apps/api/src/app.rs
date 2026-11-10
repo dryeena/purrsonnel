@@ -21,6 +21,7 @@ pub fn router(s:AppState)->Router {
  .route("/events",get(organization::events).post(organization::create_event)).route("/events/{id}",axum::routing::patch(organization::update_event))
  .route("/departments/{id}",get(detail::department).patch(lifecycle::department)).route("/divisions/{id}",axum::routing::patch(lifecycle::division))
  .route("/profile-fields",get(organization::fields).post(organization::create_field))
+ .route("/people-page-fields",get(organization::people_page_fields))
  .route("/users/{id}/profile-fields",get(configuration::profile).patch(configuration::update_profile)).route("/users/{id}/export",get(detail::export_person))
  .route("/permission-grants",get(configuration::grants).post(configuration::grant)).route("/permission-grants/{id}",axum::routing::delete(configuration::revoke))
  .route("/levels",get(detail::levels).post(configuration::create_level)).route("/position-levels/{id}",axum::routing::patch(configuration::map_level))

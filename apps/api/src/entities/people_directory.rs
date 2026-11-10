@@ -8,7 +8,7 @@ pub struct Model {
  pub primary_department_id:Option<Uuid>,pub personnel_level_id:Option<Uuid>,pub volunteer_eligible:bool,
  pub created_at:chrono::DateTime<chrono::Utc>,pub updated_at:chrono::DateTime<chrono::Utc>,
  pub level:Option<String>,pub rank:Option<i32>,pub department:Option<String>,
- pub departments:serde_json::Value,pub service_years:serde_json::Value,pub verified_years:i64,pub skills:serde_json::Value,
+ pub departments:serde_json::Value,pub service_years:serde_json::Value,pub verified_years:i64,pub skills:serde_json::Value,pub profile_fields:serde_json::Value,
 }
 #[derive(Copy,Clone,Debug,EnumIter,DeriveRelation)]pub enum Relation {}
 impl ActiveModelBehavior for ActiveModel {}

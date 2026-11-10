@@ -31,6 +31,8 @@ export function People(incoming: { path?: string; q?: string; person?: string; s
   const [search, setSearch] = useState(q);
   const [department, setDepartment] = useState('');
   const [status, setStatus] = useState('');
+  const [sort, setSort] = useState('display_name');
+  const [order, setOrder] = useState('asc');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string[]>([]);
   const [person, setPerson] = useState<string | null>(
@@ -52,9 +54,20 @@ export function People(incoming: { path?: string; q?: string; person?: string; s
     return () => clearTimeout(timer);
   }, [q]);
   const { data, error, loading } = useData<Row>(
-    `/users?q=${encodeURIComponent(search)}${department ? `&department=${department}` : ''}${status ? `&status=${status}` : ''}&page=${page}&page_size=15`,
+    `/users?q=${encodeURIComponent(search)}${department ? `&department=${department}` : ''}${status ? `&status=${status}` : ''}&sort=${sort}&order=${order}&page=${page}&page_size=15`,
   );
   const { data: org } = useData<Row>('/organization/tree');
+  const { data: peopleFields } = useData<Row[]>('/people-page-fields');
+  const chooseSort = (next: string) => {
+    setOrder(next === sort && order === 'asc' ? 'desc' : 'asc');
+    setSort(next);
+    setPage(1);
+  };
+  const sortLabel = (key: string, label: string) => (
+    <button type="button" class="table-sort" onClick={() => chooseSort(key)}>
+      {label} {sort === key ? (order === 'asc' ? '↑' : '↓') : '↕'}
+    </button>
+  );
   const filter = {
     op: 'and',
     args: [
@@ -101,6 +114,11 @@ export function People(incoming: { path?: string; q?: string; person?: string; s
             <Icon name="plus" size={17} />
             Save this view
           </button>
+        )}
+        {can(me, 'people.bulk_update') && (
+          <a class="button secondary" href="/lists">
+            Bulk actions
+          </a>
         )}
         <AddPersonButton />
       </PageHead>
@@ -192,11 +210,14 @@ export function People(incoming: { path?: string; q?: string; person?: string; s
                       }
                     />
                   </th>
-                  <th>PERSON</th>
-                  <th>DEPARTMENTS</th>
-                  <th>LEVEL</th>
-                  <th>SERVICE</th>
-                  <th>STATUS</th>
+                  <th>{sortLabel('display_name', 'PERSON')}</th>
+                  <th>{sortLabel('department', 'DEPARTMENTS')}</th>
+                  <th>{sortLabel('level', 'LEVEL')}</th>
+                  <th>{sortLabel('verified_years', 'SERVICE')}</th>
+                  <th>{sortLabel('status', 'STATUS')}</th>
+                  {peopleFields?.map((field) => (
+                    <th key={field.id}>{field.label}</th>
+                  ))}
                   <th />
                 </tr>
               </thead>
@@ -257,6 +278,11 @@ export function People(incoming: { path?: string; q?: string; person?: string; s
                     <td>
                       <Status value={u.status} />
                     </td>
+                    {peopleFields?.map((field) => (
+                      <td key={field.id}>
+                        {u.profile_fields?.[field.key] ?? <span class="muted">—</span>}
+                      </td>
+                    ))}
                     <td>
                       <button
                         type="button"
