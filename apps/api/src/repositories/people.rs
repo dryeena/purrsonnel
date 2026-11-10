@@ -191,6 +191,9 @@ pub async fn set_year_insert_user_service_years<C: ConnectionTrait>(db: &C, p1: 
     let statement = db.get_database_backend().build(&query);
     db.execute(statement).await
 }
+pub async fn set_year_select_user_departments<C: ConnectionTrait, T: TryGetable>(db:&C,p1:impl Into<Value>)->Result<T,DbErr>{
+ let statement=Statement::from_sql_and_values(DbBackend::Postgres,"SELECT EXISTS(SELECT 1 FROM user_departments WHERE user_id=$1 AND ended_at IS NULL AND membership_status='active')",vec![p1.into()]);db.query_one(statement).await?.ok_or_else(||DbErr::RecordNotFound("Record not found".into()))?.try_get_by_index(0)
+}
 
 pub async fn set_year_update_users<C: ConnectionTrait>(db: &C, p1: impl Into<Value>) -> Result<ExecResult, DbErr> {
     let p1: Value = p1.into();

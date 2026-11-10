@@ -9,10 +9,19 @@ import { global } from '../../lib/permissions';
 import { api } from '../../services/api-client';
 import type { Row } from '../../types/api';
 
-export function CustomProfileFields({ personId }: { personId: string }) {
+export function CustomProfileFields({
+  personId,
+  editing = false,
+  onSaved,
+}: {
+  personId: string;
+  editing?: boolean;
+  onSaved?: () => void;
+}) {
   const me = useAuth();
   const { data } = useData<Row[]>(`/users/${personId}/profile-fields`);
   const [open, setOpen] = useState(false);
+  const editorOpen = editing || open;
   if (!data?.length) return null;
   const editable = data.filter(
     (f) => global(me, 'people.edit') || (personId === me.user.id && f.editable_by === 'self'),
@@ -29,7 +38,7 @@ export function CustomProfileFields({ personId }: { personId: string }) {
     <div class="detail-section">
       <div class="detail-section-heading">
         <h3>Organization profile fields</h3>
-        {editable.length > 0 && (
+        {!editing && editable.length > 0 && (
           <button
             type="button"
             class="button secondary small-button"
@@ -47,13 +56,14 @@ export function CustomProfileFields({ personId }: { personId: string }) {
           </div>
         ))}
       </div>
-      {open && (
+      {editorOpen && editable.length > 0 && (
         <Form
           fields={fields}
           onSubmit={async (b) => {
             await api(`/users/${personId}/profile-fields`, 'PATCH', { values: b });
             setOpen(false);
             refresh();
+            onSaved?.();
           }}
         />
       )}

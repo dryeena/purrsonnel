@@ -2,6 +2,7 @@
 #![allow(unused_imports)]
 use sea_orm::{ConnectionTrait, DbBackend, DbErr, ExecResult, QueryResult, Statement, TryGetable, Value};
 use sea_orm::sea_query::{Alias, Condition, Expr, Func, LockType, OnConflict, Order, Query, SimpleExpr};
+use uuid::Uuid;
 use crate::entities::*;
 mod postgres {
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
@@ -9,6 +10,9 @@ pub(super) const PENDING_PERSON_SELECT_POSITION_POSTINGS: &str = "SELECT pos.dep
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const DEPARTMENT_UPDATE_DEPARTMENTS: &str = "UPDATE departments SET name=COALESCE($2,name),description=COALESCE($3,description),lead_user_id=CASE WHEN $5 THEN NULL ELSE COALESCE($4,lead_user_id) END,active=COALESCE($6,active) WHERE id=$1";
 pub(super) const DEPARTMENT_SELECT_USER_DEPARTMENTS: &str = "SELECT EXISTS(SELECT 1 FROM user_departments WHERE department_id=$1 AND user_id=$2 AND ended_at IS NULL)";
+pub(super) const MEMBERS_SELECT_USER_DEPARTMENTS: &str = "SELECT jsonb_build_object('id',u.id,'display_name',u.display_name,'membership_status',m.membership_status) FROM user_departments m JOIN users u ON u.id=m.user_id WHERE m.department_id=$1 AND m.ended_at IS NULL ORDER BY u.display_name";
+pub(super) const MEMBER_ACTIVITY_SELECT_DEPARTMENTS: &str = "SELECT COALESCE(lead_user_id=$2,false) FROM departments WHERE id=$1";
+pub(super) const MEMBER_ACTIVITY_UPDATE_USER_DEPARTMENTS: &str = "UPDATE user_departments SET membership_status=$3 WHERE department_id=$1 AND user_id=$2 AND ended_at IS NULL";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const DIVISION_UPDATE_DIVISIONS: &str = "UPDATE divisions SET name=COALESCE($2,name),description=COALESCE($3,description),lead_user_id=CASE WHEN $5 THEN NULL ELSE COALESCE($4,lead_user_id) END,active=COALESCE($6,active) WHERE id=$1";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
@@ -22,6 +26,9 @@ pub(super) const REOPEN_SELECT_VOLUNTEER_ENTRIES: &str = "SELECT department_id,s
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const EDIT_ENTRY_SELECT_VOLUNTEER_ENTRIES_2: &str = "SELECT EXISTS(SELECT 1 FROM volunteer_entries WHERE volunteer_user_id=$1 AND id<>$4 AND status IN ('draft','submitted','approved') AND started_at<$3 AND ended_at>$2)";
 }
+pub async fn members_select_user_departments<C:ConnectionTrait,T:TryGetable>(db:&C,department:Uuid)->Result<Vec<T>,DbErr>{let s=Statement::from_sql_and_values(DbBackend::Postgres,postgres::MEMBERS_SELECT_USER_DEPARTMENTS,vec![department.into()]);db.query_all(s).await?.into_iter().map(|r|r.try_get_by_index(0)).collect()}
+pub async fn member_activity_select_departments<C:ConnectionTrait,T:TryGetable>(db:&C,department:Uuid,actor:Uuid)->Result<T,DbErr>{let s=Statement::from_sql_and_values(DbBackend::Postgres,postgres::MEMBER_ACTIVITY_SELECT_DEPARTMENTS,vec![department.into(),actor.into()]);db.query_one(s).await?.ok_or_else(||DbErr::RecordNotFound("Department not found".into()))?.try_get_by_index(0)}
+pub async fn member_activity_update_user_departments<C:ConnectionTrait>(db:&C,department:Uuid,user:Uuid,status:String)->Result<ExecResult,DbErr>{let s=Statement::from_sql_and_values(DbBackend::Postgres,postgres::MEMBER_ACTIVITY_UPDATE_USER_DEPARTMENTS,vec![department.into(),user.into(),status.into()]);db.execute(s).await}
 
 pub async fn pending_person_insert_users<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>) -> Result<T, DbErr> {
     let p1: Value = p1.into();

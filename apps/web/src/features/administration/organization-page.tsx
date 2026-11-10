@@ -24,8 +24,8 @@ export function Organization(_: { path?: string }) {
   const { data, error, loading } = useData<Row>('/organization/tree');
   const [create, setCreate] = useState('');
   const [department, setDepartment] = useState<Row | null>(null);
-  const { data: members } = useData<Row>(
-    department ? `/users?department=${department.id}&page_size=100` : null,
+  const { data: members } = useData<Row[]>(
+    department ? `/departments/${department.id}/members` : null,
   );
   return (
     <>
@@ -148,18 +148,37 @@ export function Organization(_: { path?: string }) {
             <strong>Department lead:</strong> {department.lead_name || 'Unassigned'}
           </p>
           <div class="member-list">
-            {members?.items.map((u: Row) => (
-              <a key={u.id} class="person-cell" href={`/people?person=${u.id}`}>
-                <Avatar name={u.display_name} />
-                <span>
-                  <strong>{u.display_name}</strong>
-                  <small>
-                    {u.level || 'Community'}
-                    {u.primary_department_id === department.id ? ' · Primary department' : ''}
-                  </small>
-                </span>
-                <Icon name="chevron" size={16} />
-              </a>
+            {members?.map((u: Row) => (
+              <div key={u.id} class="person-cell">
+                <a href={`/people?person=${u.id}`}>
+                  <Avatar name={u.display_name} />
+                  <span>
+                    <strong>{u.display_name}</strong>
+                    <small>
+                      {u.membership_status === 'active'
+                        ? 'Active team member'
+                        : 'Inactive team member'}
+                      {u.primary_department_id === department.id ? ' · Primary department' : ''}
+                    </small>
+                  </span>
+                  <Icon name="chevron" size={16} />
+                </a>
+                {(department.lead_user_id === me.user.id || can(me, 'people.edit')) && (
+                  <select
+                    aria-label={`Team activity for ${u.display_name}`}
+                    value={u.membership_status}
+                    onChange={async (e) => {
+                      await api(`/departments/${department.id}/members/${u.id}`, 'PATCH', {
+                        membership_status: e.currentTarget.value,
+                      });
+                      refresh();
+                    }}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                )}
+              </div>
             ))}
           </div>
         </Modal>

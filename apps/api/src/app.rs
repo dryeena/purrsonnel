@@ -20,6 +20,7 @@ pub fn router(s:AppState)->Router {
  .route("/organization/tree",get(organization::tree)).route("/departments",get(detail::departments).post(organization::create_department)).route("/divisions",get(detail::divisions).post(organization::create_division))
  .route("/events",get(organization::events).post(organization::create_event)).route("/events/{id}",axum::routing::patch(organization::update_event))
  .route("/departments/{id}",get(detail::department).patch(lifecycle::department)).route("/divisions/{id}",axum::routing::patch(lifecycle::division))
+ .route("/departments/{id}/members",get(lifecycle::members)).route("/departments/{id}/members/{user}",axum::routing::patch(lifecycle::member_activity))
  .route("/profile-fields",get(organization::fields).post(organization::create_field))
  .route("/people-page-fields",get(organization::people_page_fields))
  .route("/users/{id}/profile-fields",get(configuration::profile).patch(configuration::update_profile)).route("/users/{id}/export",get(detail::export_person))

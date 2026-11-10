@@ -203,7 +203,11 @@ export function App() {
           </nav>
           <div class="sidebar-bottom">
             <InstallApp />
-            <a class="profile" href="/people?self=1" onClick={() => setMobile(false)}>
+            <a
+              class="profile"
+              href={`/people?person=${identity.user.id}`}
+              onClick={() => setMobile(false)}
+            >
               <Avatar name={identity.user.display_name} />
               <div>
                 <strong>{identity.user.display_name}</strong>
@@ -261,7 +265,11 @@ export function App() {
                 </form>
               )}
               <Notifications key={identity.user.id} />
-              <a class="topbar-avatar" href="/people?self=1" aria-label="My profile">
+              <a
+                class="topbar-avatar"
+                href={`/people?person=${identity.user.id}`}
+                aria-label="My profile"
+              >
                 <Avatar name={identity.user.display_name} small />
               </a>
             </div>
@@ -328,7 +336,7 @@ export function App() {
               { path: '/', label: 'Home', icon: 'dashboard' },
               { path: '/requests', label: 'Requests', icon: 'bell' },
               { path: '/volunteer', label: 'Volunteer', icon: 'heart' },
-              { path: '/people?self=1', label: 'Me', icon: 'people' },
+              { path: `/people?person=${identity.user.id}`, label: 'Me', icon: 'people' },
             ].map((n) => (
               <a
                 key={n.path}

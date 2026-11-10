@@ -181,58 +181,61 @@ export function Person({ id, onClose }: { id: string; onClose: () => void }) {
                 Export person record
               </Action>
             )}
-            <CustomProfileFields personId={id} />
+            {!can(me, 'people.edit') && <CustomProfileFields personId={id} />}
             {can(me, 'people.edit') && (
               <button type="button" class="button secondary" onClick={() => setEdit(!edit)}>
-                Edit person
+                {edit ? 'Close profile editor' : 'Edit profile'}
                 <Icon name="arrow" size={15} />
               </button>
             )}
             {edit && (
-              <Form
-                fields={[
-                  {
-                    name: 'display_name',
-                    label: 'Display name',
-                    required: true,
-                    value: u.display_name,
-                  },
-                  {
-                    name: 'status',
-                    label: 'Status',
-                    type: 'select',
-                    required: true,
-                    value: u.status,
-                    options: ['active', 'inactive', 'former'].map((value) => ({
-                      value,
-                      label: value,
-                    })),
-                  },
-                  {
-                    name: 'volunteer_eligible',
-                    label: 'Eligible to volunteer',
-                    type: 'checkbox',
-                    value: u.volunteer_eligible,
-                  },
-                  ...(global(me, 'people.edit')
-                    ? [
-                        {
-                          name: 'personnel_level_id',
-                          label: 'Personnel level',
-                          type: 'select',
-                          value: u.personnel_level_id,
-                          options: org?.levels.map((l: Row) => ({ value: l.id, label: l.label })),
-                        },
-                      ]
-                    : []),
-                ]}
-                onSubmit={async (b) => {
-                  if (!b.personnel_level_id) delete b.personnel_level_id;
-                  await api(`/users/${id}`, 'PATCH', b);
-                  setEdit(false);
-                  refresh();
-                }}
-              />
+              <div class="detail-section">
+                <h3>Edit profile</h3>
+                <Form
+                  fields={[
+                    {
+                      name: 'display_name',
+                      label: 'Display name',
+                      required: true,
+                      value: u.display_name,
+                    },
+                    {
+                      name: 'status',
+                      label: 'Status',
+                      type: 'select',
+                      required: true,
+                      value: u.status,
+                      options: ['active', 'inactive', 'former'].map((value) => ({
+                        value,
+                        label: value,
+                      })),
+                    },
+                    {
+                      name: 'volunteer_eligible',
+                      label: 'Eligible to volunteer',
+                      type: 'checkbox',
+                      value: u.volunteer_eligible,
+                    },
+                    ...(global(me, 'people.edit')
+                      ? [
+                          {
+                            name: 'personnel_level_id',
+                            label: 'Personnel level',
+                            type: 'select',
+                            value: u.personnel_level_id,
+                            options: org?.levels.map((l: Row) => ({ value: l.id, label: l.label })),
+                          },
+                        ]
+                      : []),
+                  ]}
+                  onSubmit={async (b) => {
+                    if (!b.personnel_level_id) delete b.personnel_level_id;
+                    await api(`/users/${id}`, 'PATCH', b);
+                    refresh();
+                  }}
+                />
+                <CustomProfileFields personId={id} editing onSaved={() => setEdit(false)} />
+              </div>
             )}
           </>
         )

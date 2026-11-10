@@ -116,7 +116,7 @@ export function Dashboard(_: { path?: string }) {
                 value: identity.user.verified_years,
                 icon: 'people',
                 note: 'Every year you showed up counts',
-                href: '/people?self=1',
+                href: `/people?person=${identity.user.id}`,
                 tone: 'plum',
               },
               {
