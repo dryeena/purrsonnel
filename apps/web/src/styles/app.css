@@ -1761,6 +1761,9 @@ tbody tr:hover {
 .detail-section-heading h3 {
   margin: 0;
 }
+.setting-list > .event-edition-completed {
+  opacity: 0.52;
+}
 .detail-section p {
   font-size: 11px;
   margin-bottom: 14px;

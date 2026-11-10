@@ -84,23 +84,30 @@ export function Settings(_: { path?: string }) {
         >
           <div class="setting-list">
             {events?.length ? (
-              events.map((event) => (
-                <div key={event.id}>
-                  <span>
-                    {event.name} <small class="muted">{event.year}</small>
-                  </span>
-                  <button
-                    type="button"
-                    class="text-link"
-                    onClick={async () => {
-                      await api(`/events/${event.id}`, 'PATCH', { active: !event.active });
-                      refresh();
-                    }}
-                  >
-                    {event.active ? 'Active' : 'Inactive'}
-                  </button>
-                </div>
-              ))
+              events.map((event) => {
+                const completed = !!event.ends_at && new Date(event.ends_at) < new Date();
+                return (
+                  <div key={event.id} class={completed ? 'event-edition-completed' : ''}>
+                    <span>
+                      {event.name}{' '}
+                      <small class="muted">
+                        {event.year}
+                        {completed ? ' · Completed' : ''}
+                      </small>
+                    </span>
+                    <button
+                      type="button"
+                      class="text-link"
+                      onClick={async () => {
+                        await api(`/events/${event.id}`, 'PATCH', { active: !event.active });
+                        refresh();
+                      }}
+                    >
+                      {event.active ? 'Active' : 'Inactive'}
+                    </button>
+                  </div>
+                );
+              })
             ) : (
               <Empty title="No events yet">
                 Add an event edition before recording volunteer time.
