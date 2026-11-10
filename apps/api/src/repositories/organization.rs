@@ -6,6 +6,18 @@ use crate::entities::*;
 mod postgres {
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const TREE_SELECT_USER_DEPARTMENTS: &str = "SELECT to_jsonb(d)||jsonb_build_object('lead_name',u.display_name,'member_count',(SELECT count(*) FROM user_departments m WHERE m.department_id=d.id AND m.ended_at IS NULL)) FROM departments d LEFT JOIN users u ON u.id=d.lead_user_id WHERE d.active ORDER BY d.name";
+pub(super) const EVENTS_SELECT_EVENT_EDITIONS: &str = "SELECT to_jsonb(event_editions) FROM event_editions ORDER BY active DESC,year DESC,name";
+}
+
+pub async fn events_select_event_editions<C: ConnectionTrait, T: TryGetable>(db: &C) -> Result<Vec<T>, DbErr> {
+ let statement=Statement::from_sql_and_values(DbBackend::Postgres,postgres::EVENTS_SELECT_EVENT_EDITIONS,vec![]);
+ db.query_all(statement).await?.into_iter().map(|row|row.try_get_by_index(0)).collect()
+}
+pub async fn events_insert_event_editions<C: ConnectionTrait, T: TryGetable>(db:&C,name:String,year:i32,starts_at:Option<chrono::DateTime<chrono::Utc>>,ends_at:Option<chrono::DateTime<chrono::Utc>>,active:bool)->Result<T,DbErr>{
+ let mut query=Query::insert();query.into_table(event_editions::Entity).columns([event_editions::Column::Name,event_editions::Column::Year,event_editions::Column::StartsAt,event_editions::Column::EndsAt,event_editions::Column::Active]).values_panic([Expr::value(name).into(),Expr::value(year).into(),Expr::value(starts_at).into(),Expr::value(ends_at).into(),Expr::value(active).into()]);query.returning(Query::returning().column(event_editions::Column::Id));db.query_one(db.get_database_backend().build(&query)).await?.ok_or_else(||DbErr::RecordNotFound("Event was not created".into()))?.try_get_by_index(0)
+}
+pub async fn events_update_event_editions<C: ConnectionTrait>(db:&C,id:uuid::Uuid,active:bool)->Result<ExecResult,DbErr>{
+ let mut query=Query::update();query.table(event_editions::Entity).value(event_editions::Column::Active,Expr::value(active));query.cond_where(Expr::col(event_editions::Column::Id).eq(id));db.execute(db.get_database_backend().build(&query)).await
 }
 
 pub async fn tree_select_user_departments<C: ConnectionTrait, T: TryGetable>(db: &C) -> Result<Vec<T>, DbErr> {

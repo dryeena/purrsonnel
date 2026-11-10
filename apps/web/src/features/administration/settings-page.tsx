@@ -15,6 +15,7 @@ export function Settings(_: { path?: string }) {
     can(me, 'settings.manage') ? '/profile-fields' : null,
   );
   const { data: org } = useData<Row>('/organization/tree');
+  const { data: events } = useData<Row[]>(can(me, 'settings.manage') ? '/events' : null);
   const [add, setAdd] = useState('');
   if (!can(me, 'settings.manage'))
     return <ErrorBox message="Settings are available to system administrators." />;
@@ -73,6 +74,41 @@ export function Settings(_: { path?: string }) {
           </div>
         </Panel>
         <Panel
+          title="Event editions"
+          description="Only active events appear in volunteer time entry and reporting."
+          action={
+            <button type="button" class="text-link" onClick={() => setAdd('event')}>
+              + Add event
+            </button>
+          }
+        >
+          <div class="setting-list">
+            {events?.length ? (
+              events.map((event) => (
+                <div key={event.id}>
+                  <span>
+                    {event.name} <small class="muted">{event.year}</small>
+                  </span>
+                  <button
+                    type="button"
+                    class="text-link"
+                    onClick={async () => {
+                      await api(`/events/${event.id}`, 'PATCH', { active: !event.active });
+                      refresh();
+                    }}
+                  >
+                    {event.active ? 'Active' : 'Inactive'}
+                  </button>
+                </div>
+              ))
+            ) : (
+              <Empty title="No events yet">
+                Add an event edition before recording volunteer time.
+              </Empty>
+            )}
+          </div>
+        </Panel>
+        <Panel
           title="Organization application questions"
           description="New postings snapshot these questions."
         >
@@ -91,78 +127,115 @@ export function Settings(_: { path?: string }) {
       </div>
       {add && (
         <Modal
-          title={add === 'field' ? 'Add profile field' : 'Add default question'}
+          title={
+            add === 'field'
+              ? 'Add profile field'
+              : add === 'event'
+                ? 'Add event edition'
+                : 'Add default question'
+          }
           onClose={() => setAdd('')}
         >
           <Form
-            fields={[
-              {
-                name: 'key',
-                label: 'Unique identifier (letters, digits, underscore)',
-                required: true,
-              },
-              { name: 'label', label: 'Display label', required: true },
-              {
-                name: 'type',
-                label: 'Type',
-                type: 'select',
-                required: true,
-                options: (add === 'field'
-                  ? ['text', 'number', 'date', 'boolean', 'single_select', 'multi_select', 'url']
-                  : ['text', 'textarea', 'number', 'date', 'boolean', 'url']
-                ).map((v) => ({ value: v, label: v })),
-              },
-              ...(add === 'field'
+            fields={
+              add === 'event'
                 ? [
+                    { name: 'name', label: 'Event name', required: true },
                     {
-                      name: 'visibility',
-                      label: 'Visibility',
-                      type: 'select',
-                      required: true,
-                      options: [
-                        { value: 'self', label: 'Self and sensitive HR' },
-                        { value: 'personnel', label: 'Authorized personnel readers' },
-                        { value: 'sensitive', label: 'Self and sensitive HR only' },
-                      ],
-                    },
-                    {
-                      name: 'editable_by',
-                      label: 'Who may edit?',
-                      type: 'select',
-                      required: true,
-                      options: [
-                        { value: 'hr', label: 'HR only' },
-                        { value: 'self', label: 'Self or authorized HR' },
-                      ],
-                    },
-                    {
-                      name: 'choices_text',
-                      label: 'Dropdown choices (one per line)',
-                      type: 'textarea',
-                      help: 'Used for dropdown and multi-select fields only.',
-                      maxLength: 4000,
-                    },
-                    {
-                      name: 'max_length',
-                      label: 'Maximum text length',
+                      name: 'year',
+                      label: 'Event year',
                       type: 'number',
-                      min: 1,
-                      max: 10000,
-                      value: 4000,
+                      required: true,
+                      min: 2000,
+                      max: 2100,
+                      value: new Date().getFullYear(),
                     },
-                  ]
-                : []),
-              ...(add === 'question'
-                ? [
-                    { name: 'required', label: 'Required response', type: 'checkbox' },
+                    { name: 'starts_at', label: 'Starts', type: 'datetime-local' },
+                    { name: 'ends_at', label: 'Ends', type: 'datetime-local' },
                     {
-                      name: 'sensitive',
-                      label: 'Restrict this answer to sensitive-data access',
+                      name: 'active',
+                      label: 'Make this event active now',
                       type: 'checkbox',
+                      value: true,
                     },
                   ]
-                : []),
-            ]}
+                : [
+                    {
+                      name: 'key',
+                      label: 'Unique identifier (letters, digits, underscore)',
+                      required: true,
+                    },
+                    { name: 'label', label: 'Display label', required: true },
+                    {
+                      name: 'type',
+                      label: 'Type',
+                      type: 'select',
+                      required: true,
+                      options: (add === 'field'
+                        ? [
+                            'text',
+                            'number',
+                            'date',
+                            'boolean',
+                            'single_select',
+                            'multi_select',
+                            'url',
+                          ]
+                        : ['text', 'textarea', 'number', 'date', 'boolean', 'url']
+                      ).map((v) => ({ value: v, label: v })),
+                    },
+                    ...(add === 'field'
+                      ? [
+                          {
+                            name: 'visibility',
+                            label: 'Visibility',
+                            type: 'select',
+                            required: true,
+                            options: [
+                              { value: 'self', label: 'Self and sensitive HR' },
+                              { value: 'personnel', label: 'Authorized personnel readers' },
+                              { value: 'sensitive', label: 'Self and sensitive HR only' },
+                            ],
+                          },
+                          {
+                            name: 'editable_by',
+                            label: 'Who may edit?',
+                            type: 'select',
+                            required: true,
+                            options: [
+                              { value: 'hr', label: 'HR only' },
+                              { value: 'self', label: 'Self or authorized HR' },
+                            ],
+                          },
+                          {
+                            name: 'choices_text',
+                            label: 'Dropdown choices (one per line)',
+                            type: 'textarea',
+                            help: 'Used for dropdown and multi-select fields only.',
+                            maxLength: 4000,
+                          },
+                          {
+                            name: 'max_length',
+                            label: 'Maximum text length',
+                            type: 'number',
+                            min: 1,
+                            max: 10000,
+                            value: 4000,
+                          },
+                        ]
+                      : []),
+                    ...(add === 'question'
+                      ? [
+                          { name: 'required', label: 'Required response', type: 'checkbox' },
+                          {
+                            name: 'sensitive',
+                            label: 'Restrict this answer to sensitive-data access',
+                            type: 'checkbox',
+                          },
+                        ]
+                      : []),
+                  ]
+            }
             submit="Create"
             onSubmit={async (b) => {
               if (add === 'field') {
@@ -176,7 +249,19 @@ export function Settings(_: { path?: string }) {
                 }
                 b.choices = choices;
               }
-              await api(add === 'field' ? '/profile-fields' : '/default-questions', 'POST', b);
+              if (add === 'event') {
+                if (b.starts_at) b.starts_at = new Date(b.starts_at).toISOString();
+                if (b.ends_at) b.ends_at = new Date(b.ends_at).toISOString();
+              }
+              await api(
+                add === 'field'
+                  ? '/profile-fields'
+                  : add === 'event'
+                    ? '/events'
+                    : '/default-questions',
+                'POST',
+                b,
+              );
               setAdd('');
               refresh();
             }}

@@ -5,7 +5,7 @@ use sea_orm::sea_query::{Alias, Condition, Expr, Func, LockType, OnConflict, Ord
 use crate::entities::*;
 mod postgres {
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
-pub(super) const LIST_SELECT_VOLUNTEER_ENTRIES: &str = "SELECT to_jsonb(e)||jsonb_build_object('volunteer_name',u.display_name,'department',d.name,'decided_by_name',a.display_name) FROM volunteer_entries e JOIN users u ON u.id=e.volunteer_user_id JOIN departments d ON d.id=e.department_id LEFT JOIN users a ON a.id=e.decided_by_user_id WHERE e.volunteer_user_id=$1 OR has_permission($1,'volunteer.time.approve',e.department_id) OR has_permission($1,'volunteer.time.admin',e.department_id) ORDER BY e.created_at DESC,e.id LIMIT $2 OFFSET $3";
+pub(super) const LIST_SELECT_VOLUNTEER_ENTRIES: &str = "SELECT to_jsonb(e)||jsonb_build_object('volunteer_name',u.display_name,'department',d.name,'event',ev.name,'decided_by_name',a.display_name) FROM volunteer_entries e JOIN users u ON u.id=e.volunteer_user_id JOIN departments d ON d.id=e.department_id LEFT JOIN event_editions ev ON ev.id=e.event_edition_id LEFT JOIN users a ON a.id=e.decided_by_user_id WHERE e.volunteer_user_id=$1 OR has_permission($1,'volunteer.time.approve',e.department_id) OR has_permission($1,'volunteer.time.admin',e.department_id) ORDER BY e.created_at DESC,e.id LIMIT $2 OFFSET $3";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const CREATE_SELECT_USERS: &str = "SELECT volunteer_eligible AND myfwa_id IS NOT NULL AND status='active' FROM users WHERE id=$1";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
@@ -22,7 +22,7 @@ pub(super) const PREVIEW_SELECT_VOLUNTEER_APPROVAL_TOKENS: &str = "SELECT e.depa
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
 pub(super) const DECIDE_SELECT_VOLUNTEER_APPROVAL_TOKENS_2: &str = "SELECT EXISTS(SELECT 1 FROM volunteer_approval_tokens WHERE token_hash=$1 AND expires_at>now() AND revoked_at IS NULL AND redeemed_at IS NULL)";
 /// PostgreSQL-specific policy, projection, conflict handling, or locking workflow.
-pub(super) const REPORT_SELECT_VOLUNTEER_ENTRIES: &str = "SELECT jsonb_build_object('user_id',u.id,'display_name',u.display_name,'department',d.name,'event',ev.name,'minutes',sum(e.minutes_worked)) FROM volunteer_entries e JOIN users u ON u.id=e.volunteer_user_id JOIN departments d ON d.id=e.department_id LEFT JOIN event_editions ev ON ev.id=e.event_edition_id WHERE e.status='approved' AND (e.volunteer_user_id=$1 OR has_permission($1,'volunteer.time.approve',e.department_id) OR has_permission($1,'volunteer.time.admin',e.department_id)) GROUP BY u.id,d.id,ev.id ORDER BY d.name,u.display_name";
+pub(super) const REPORT_SELECT_VOLUNTEER_ENTRIES: &str = "SELECT jsonb_build_object('user_id',u.id,'display_name',u.display_name,'department',d.name,'event_edition_id',ev.id,'event',ev.name,'minutes',sum(e.minutes_worked)) FROM volunteer_entries e JOIN users u ON u.id=e.volunteer_user_id JOIN departments d ON d.id=e.department_id LEFT JOIN event_editions ev ON ev.id=e.event_edition_id WHERE e.status='approved' AND (e.volunteer_user_id=$1 OR has_permission($1,'volunteer.time.approve',e.department_id) OR has_permission($1,'volunteer.time.admin',e.department_id)) GROUP BY u.id,d.id,ev.id ORDER BY d.name,u.display_name";
 }
 
 pub async fn list_select_volunteer_entries<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>, p2: impl Into<Value>, p3: impl Into<Value>) -> Result<Vec<T>, DbErr> {

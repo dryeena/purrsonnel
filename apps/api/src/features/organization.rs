@@ -3,6 +3,7 @@ use axum::{extract::State,Json};
 use serde::Deserialize;
 use serde_json::{json,Value};
 use uuid::Uuid;
+use chrono::{DateTime,Utc};
 use crate::{AppState,auth::Principal,error::{ApiError,Result},validation};
 use super::audit;
 pub async fn tree(State(s):State<AppState>,p:Principal)->Result<Json<Value>>{
@@ -19,6 +20,11 @@ pub async fn tree(State(s):State<AppState>,p:Principal)->Result<Json<Value>>{
 pub async fn create_department(State(s):State<AppState>,p:Principal,Json(b):Json<Department>)->Result<Json<Value>>{p.require(&s,"organization.manage",None).await?;validation::text(&b.name,100)?;validation::text(&b.slug,100)?;let mut tx=s.db.begin().await?;let id:Uuid=crate::repositories::organization::create_department_insert_departments(&tx, (&b.name).to_owned(), (b.slug).to_owned(), (b.division_id).to_owned(), (b.description.unwrap_or_default()).to_owned(), (b.lead_user_id).to_owned()).await?;audit(&mut tx,p.id,"department.created","department",id,Value::Null,json!({"name":b.name})).await?;tx.commit().await?;Ok(Json(json!({"id":id})))}
 #[derive(Deserialize)]pub struct Division {pub name:String,pub description:Option<String>}
 pub async fn create_division(State(s):State<AppState>,p:Principal,Json(b):Json<Division>)->Result<Json<Value>>{p.require(&s,"organization.manage",None).await?;validation::text(&b.name,100)?;let mut tx=s.db.begin().await?;let id:Uuid=crate::repositories::organization::create_division_insert_divisions(&tx, (&b.name).to_owned(), (b.description.unwrap_or_default()).to_owned()).await?;audit(&mut tx,p.id,"division.created","division",id,Value::Null,json!({"name":b.name})).await?;tx.commit().await?;Ok(Json(json!({"id":id})))}
+pub async fn events(State(s):State<AppState>,p:Principal)->Result<Json<Value>>{p.require(&s,"settings.manage",None).await?;let rows:Vec<Value>=crate::repositories::organization::events_select_event_editions(&s.db).await?;Ok(Json(json!(rows)))}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]pub struct Event {pub name:String,pub year:i32,pub starts_at:Option<DateTime<Utc>>,pub ends_at:Option<DateTime<Utc>>,pub active:Option<bool>}
+pub async fn create_event(State(s):State<AppState>,p:Principal,Json(b):Json<Event>)->Result<Json<Value>>{p.require(&s,"settings.manage",None).await?;validation::text(&b.name,120)?;if !(2000..=2100).contains(&b.year)||b.ends_at.zip(b.starts_at).is_some_and(|(end,start)|end<start){return Err(ApiError::bad("Provide a valid event year and date range"));}let mut tx=s.db.begin().await?;let id:Uuid=crate::repositories::organization::events_insert_event_editions(&tx,b.name,b.year,b.starts_at,b.ends_at,b.active.unwrap_or(true)).await?;audit(&mut tx,p.id,"event.created","event",id,Value::Null,json!({"year":b.year})).await?;tx.commit().await?;Ok(Json(json!({"id":id})))}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]pub struct EventUpdate {pub active:bool}
+pub async fn update_event(State(s):State<AppState>,p:Principal,axum::extract::Path(id):axum::extract::Path<Uuid>,Json(b):Json<EventUpdate>)->Result<Json<Value>>{p.require(&s,"settings.manage",None).await?;let mut tx=s.db.begin().await?;if crate::repositories::organization::events_update_event_editions(&tx,id,b.active).await?.rows_affected()==0{return Err(ApiError::missing());}audit(&mut tx,p.id,"event.updated","event",id,Value::Null,json!({"active":b.active})).await?;tx.commit().await?;Ok(Json(json!({"ok":true})))}
 pub async fn fields(State(s):State<AppState>,p:Principal)->Result<Json<Value>> {p.require(&s,"settings.manage",None).await?;Ok(Json(json!(crate::repositories::organization::fields_select_profile_field_definitions::<_,Value>(&s.db).await?)))}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]pub struct Field {pub key:String,pub label:String,pub r#type:String,pub choices:Option<Value>,pub visibility:Option<String>,pub editable_by:Option<String>,pub max_length:Option<u32>}
 pub async fn create_field(State(s):State<AppState>,p:Principal,Json(b):Json<Field>)->Result<Json<Value>>{

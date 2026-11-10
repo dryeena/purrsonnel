@@ -32,6 +32,7 @@ export function Volunteers(_: { path?: string }) {
   const [scan, setScan] = useState(location.pathname.endsWith('/approve'));
   const [tab, setTab] = useState(new URLSearchParams(location.search).get('tab') || 'entries');
   const [timeMode, setTimeMode] = useState(false);
+  const [eventId, setEventId] = useState('');
   const {
     data: entries,
     error,
@@ -42,6 +43,21 @@ export function Volunteers(_: { path?: string }) {
   const approve = !!me.user.personnel_level_id;
   const rows =
     tab === 'mine' ? entries?.filter((e) => e.volunteer_user_id === me.user.id) : entries;
+  const eventRows = rows?.filter((entry) => !eventId || entry.event_edition_id === eventId);
+  const reportRows = report?.filter((entry) => !eventId || entry.event_edition_id === eventId);
+  const reportGroups = Object.values(
+    (reportRows || []).reduce<Record<string, Row>>((groups, entry) => {
+      const group = (groups[entry.user_id] ||= {
+        user_id: entry.user_id,
+        display_name: entry.display_name,
+        minutes: 0,
+        entries: [],
+      });
+      group.minutes += Number(entry.minutes);
+      group.entries.push(entry);
+      return groups;
+    }, {}),
+  );
   const minutes =
     entries
       ?.filter((e) => e.volunteer_user_id === me.user.id && e.status === 'approved')
@@ -107,13 +123,26 @@ export function Volunteers(_: { path?: string }) {
           </button>
         ))}
       </div>
+      <div class="toolbar">
+        <label>
+          <span>Event</span>
+          <select value={eventId} onChange={(event) => setEventId(event.currentTarget.value)}>
+            <option value="">All active events</option>
+            {org?.events.map((event: Row) => (
+              <option key={event.id} value={event.id}>
+                {event.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       <Panel>
         {error ? (
           <ErrorBox message={error} />
         ) : loading ? (
           <Loading />
         ) : tab === 'report' ? (
-          report?.length ? (
+          reportGroups.length ? (
             <div class="table-wrap">
               <table>
                 <thead>
@@ -125,11 +154,30 @@ export function Volunteers(_: { path?: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {report.map((r) => (
-                    <tr key={`${r.user_id}:${r.department}:${r.event ?? 'none'}`}>
-                      <td>{r.display_name}</td>
-                      <td>{r.department}</td>
-                      <td>{r.event || 'No edition assigned'}</td>
+                  {reportGroups.map((r) => (
+                    <tr key={r.user_id}>
+                      <td>
+                        <strong>{r.display_name}</strong>
+                        <details>
+                          <summary>Show hour details</summary>
+                          <ul class="compact-list">
+                            {r.entries.map((entry: Row) => (
+                              <li key={`${entry.department}:${entry.event ?? 'none'}`}>
+                                {entry.department} · {entry.event || 'No event'} ·{' '}
+                                {(entry.minutes / 60).toFixed(1)}h
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      </td>
+                      <td>
+                        {r.entries.length} assignment{r.entries.length === 1 ? '' : 's'}
+                      </td>
+                      <td>
+                        {eventId
+                          ? org?.events.find((event: Row) => event.id === eventId)?.name
+                          : 'All active events'}
+                      </td>
                       <td>{(r.minutes / 60).toFixed(1)}h</td>
                     </tr>
                   ))}
@@ -139,7 +187,7 @@ export function Volunteers(_: { path?: string }) {
           ) : (
             <Empty title="Good things take a little time">Approved hours will appear here.</Empty>
           )
-        ) : rows?.length ? (
+        ) : eventRows?.length ? (
           <div class="table-wrap">
             <table>
               <thead>
@@ -153,7 +201,7 @@ export function Volunteers(_: { path?: string }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((e) => (
+                {eventRows.map((e) => (
                   <tr key={e.id}>
                     <td>
                       <strong>{e.volunteer_name}</strong>
@@ -251,6 +299,7 @@ export function Volunteers(_: { path?: string }) {
                 label: 'Event',
                 type: 'select',
                 options: org?.events.map((d: Row) => ({ value: d.id, label: d.name })),
+                value: eventId,
               },
               {
                 name: 'work_date',
