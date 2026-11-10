@@ -36,7 +36,7 @@ export function Reports(_: { path?: string }) {
           <Panel key={report.href}>
             <div class="policy-card">
               <span class="stat-icon plum">
-                <Icon name="list" />
+                <Icon name="clipboard" />
               </span>
               <h2>{report.title}</h2>
               <p class="muted">{report.description}</p>

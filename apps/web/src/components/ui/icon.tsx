@@ -56,6 +56,12 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
         <path d="M9 5h12M9 12h12M9 19h12M3 5h1m-1 7h1m-1 7h1" />
       </>
     ),
+    clipboard: (
+      <>
+        <rect x="5" y="4" width="14" height="18" rx="2" />
+        <path d="M9 4V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1M9 11h6m-6 4h6m-6 4h3" />
+      </>
+    ),
     settings: (
       <>
         <circle cx="12" cy="12" r="3" />

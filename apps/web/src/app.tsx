@@ -35,7 +35,7 @@ const nav = [
   { label: 'Lists & bulk actions', path: '/lists', icon: 'list', permission: 'people.bulk_update' },
   { label: 'Settings', path: '/settings', icon: 'settings', permission: 'settings.manage' },
   { label: 'Audit log', path: '/audit', icon: 'audit', permission: 'audit.read' },
-  { label: 'Reports', path: '/reports', icon: 'list', permission: 'people.read' },
+  { label: 'Reports', path: '/reports', icon: 'clipboard', permission: 'people.read' },
 ];
 
 export function App() {
