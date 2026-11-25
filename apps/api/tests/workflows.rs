@@ -30,6 +30,17 @@ impl Harness{
   else {assert!(body["status"].is_string());}
  }
 }
+#[sqlx::test(migrations="./migrations")]async fn main_workspace_reads_are_online(db:PgPool){
+ let h=Harness::new(db).await;let hr=h.login().await;
+ for path in ["/dashboard","/requests","/users","/organization/tree","/schedules","/terms/applicable","/volunteer/entries","/volunteer/reports/hours","/positions","/applications","/interviews","/saved-lists","/bulk-changes","/audit-events"]{
+  let(status,body,_)=h.request("GET",path,Some(&hr),Value::Null).await;
+  assert_eq!(status,StatusCode::OK,"{path}: {body}");assert!(!body.is_null(),"{path} returned an empty or malformed JSON response");
+ }
+ let sys=h.switch(&hr,"sys").await;
+ for path in ["/permission-grants","/permission-thresholds","/events","/profile-fields"]{
+  let(status,body,_)=h.request("GET",path,Some(&sys),Value::Null).await;assert_eq!(status,StatusCode::OK,"{path}: {body}");assert!(!body.is_null());
+ }
+}
 #[sqlx::test(migrations="./migrations")]async fn liveness_remains_available_when_database_is_unavailable(db:PgPool){
  let h=Harness::new(db).await;
  h.db.close().await;
