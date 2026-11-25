@@ -3280,6 +3280,11 @@ th,
 .schedule-slot > button:focus-visible {
   opacity: 1;
 }
+@media (hover: none) {
+  .schedule-slot > button:not(.schedule-slot-shift) {
+    opacity: 1;
+  }
+}
 .schedule-slot .schedule-slot-shift {
   border: 0;
   border-left: 3px solid #79518b;
