@@ -32,6 +32,33 @@ function showSchedule(response: Response) {
   );
 }
 describe('schedules', () => {
+  it('opens shift details directly from the weekly calendar', async () => {
+    const start = new Date();
+    start.setHours(10, 0, 0, 0);
+    const end = new Date(start.getTime() + 3600000);
+    showSchedule(
+      new Response(
+        JSON.stringify([
+          {
+            id: 'today',
+            title: 'Desk coverage',
+            department: 'Registration',
+            event: 'FWA',
+            starts_at: start.toISOString(),
+            ends_at: end.toISOString(),
+            assigned: [],
+            assigned_count: 0,
+            slots: 1,
+            claimed_by_me: false,
+          },
+        ]),
+      ),
+    );
+    const card = await screen.findByRole('button', { name: /Desk coverage/ });
+    fireEvent.click(card);
+    expect(screen.getByRole('dialog', { name: 'Desk coverage' })).toBeVisible();
+    expect(screen.getAllByRole('button', { name: 'Claim opening' })).toHaveLength(2);
+  });
   it('shows an empty state when there are no shifts', async () => {
     showSchedule(new Response('[]'));
     expect(await screen.findByText('No shifts scheduled yet')).toBeVisible();

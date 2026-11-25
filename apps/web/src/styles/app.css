@@ -3201,44 +3201,101 @@ th,
   margin-top: 6px;
 }
 .schedule-calendar {
-  margin: 1rem 0;
+  margin: 1.5rem 0;
+  border: 1px solid #e3dce8;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
 }
 .schedule-calendar-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  padding: 1rem;
+}
+.schedule-calendar-header strong {
+  flex: 1;
+  text-align: center;
+  min-width: 12rem;
 }
 .schedule-calendar-scroll {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 70vh;
 }
 .schedule-calendar-grid {
   display: grid;
   grid-template-columns: 4.5rem repeat(7, minmax(7rem, 1fr));
   min-width: 54rem;
   gap: 1px;
-  background: #ddd;
+  background: #eee9f0;
 }
 .schedule-calendar-grid > * {
   background: white;
-  padding: 0.4rem;
+  padding: 0.35rem;
+}
+.schedule-calendar-grid > strong,
+.schedule-calendar-grid > span:first-child {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  text-align: center;
+  padding: 0.65rem 0.3rem;
+  box-shadow: 0 1px #e7e0e9;
+}
+.schedule-calendar-grid > strong span {
+  display: block;
+  color: #73697a;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.schedule-calendar-grid > strong b {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+}
+.schedule-calendar-grid > strong.schedule-today b {
+  background: #704581;
+  color: white;
 }
 .schedule-slot {
-  min-height: 3rem;
+  min-height: 3.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
-.schedule-slot button {
+.schedule-slot > button:not(.schedule-slot-shift) {
   border: 0;
   background: transparent;
   cursor: pointer;
   text-align: left;
+  color: #75677e;
+  opacity: 0;
+  flex: 1;
 }
-.schedule-slot-shift {
+.schedule-slot:hover > button,
+.schedule-slot > button:focus-visible {
+  opacity: 1;
+}
+.schedule-slot .schedule-slot-shift {
+  border: 0;
+  border-left: 3px solid #79518b;
   background: #eee8f5;
-  border-radius: 0.25rem;
-  padding: 0.2rem;
+  color: #392243;
+  border-radius: 0.35rem;
+  padding: 0.35rem;
+  text-align: left;
+  cursor: pointer;
   overflow-wrap: anywhere;
+}
+.schedule-slot-shift strong,
+.schedule-slot-shift small {
+  display: block;
+}
+.schedule-slot-shift small {
+  font-size: 0.7rem;
+  margin-top: 0.15rem;
 }

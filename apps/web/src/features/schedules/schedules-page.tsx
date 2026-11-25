@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The calendar and its linked dialogs share state. */
 import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 
@@ -31,6 +32,7 @@ export function Schedules(_: { path?: string }) {
     [selectedStart, setSelectedStart] = useState(''),
     [lastShift, setLastShift] = useState<Row | null>(null),
     [copyShift, setCopyShift] = useState<Row | null>(null),
+    [selectedShift, setSelectedShift] = useState<Row | null>(null),
     [assign, setAssign] = useState<Row | null>(null);
   const { data: org } = useData<Row>('/organization/tree'),
     { data, error, loading } = useData<Row[]>(
@@ -64,6 +66,7 @@ export function Schedules(_: { path?: string }) {
     String(d.getHours()).padStart(2, '0') +
     ':' +
     String(d.getMinutes()).padStart(2, '0');
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   return (
     <>
       <PageHead
@@ -87,7 +90,20 @@ export function Schedules(_: { path?: string }) {
       </PageHead>
       <label class="field">
         Event
-        <select value={eventId} onChange={(e) => setEventId(e.currentTarget.value)}>
+        <select
+          value={eventId}
+          onChange={(e) => {
+            const id = e.currentTarget.value;
+            setEventId(id);
+            const event = org?.events.find((entry: Row) => entry.id === id);
+            if (event?.starts_at) {
+              const start = new Date(event.starts_at);
+              start.setHours(0, 0, 0, 0);
+              start.setDate(start.getDate() - start.getDay());
+              setWeek(start);
+            }
+          }}
+        >
           <option value="">All active events</option>
           {org?.events.map((e: Row) => (
             <option key={e.id} value={e.id}>
@@ -103,6 +119,18 @@ export function Schedules(_: { path?: string }) {
           </p>
         )}
         <div class="schedule-calendar-header">
+          <button
+            type="button"
+            class="button secondary"
+            onClick={() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              today.setDate(today.getDate() - today.getDay());
+              setWeek(today);
+            }}
+          >
+            Today
+          </button>
           <button
             type="button"
             class="button secondary"
@@ -129,12 +157,12 @@ export function Schedules(_: { path?: string }) {
           <div class="schedule-calendar-grid">
             <span>Time</span>
             {days.map((d) => (
-              <strong key={d.toISOString()}>
-                {d.toLocaleDateString(undefined, {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                })}
+              <strong
+                key={d.toISOString()}
+                class={d.toDateString() === new Date().toDateString() ? 'schedule-today' : ''}
+              >
+                <span>{d.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                <b>{d.getDate()}</b>
               </strong>
             ))}
             {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
@@ -158,9 +186,25 @@ export function Schedules(_: { path?: string }) {
                   return (
                     <div class="schedule-slot" key={localInput(slot)}>
                       {shifts.map((s) => (
-                        <span key={s.id} class="schedule-slot-shift">
-                          {s.title}
-                        </span>
+                        <button
+                          type="button"
+                          key={s.id}
+                          class="schedule-slot-shift"
+                          onClick={() => setSelectedShift(s)}
+                        >
+                          <strong>{s.title}</strong>
+                          <small>
+                            {new Date(s.starts_at).toLocaleTimeString([], {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}{' '}
+                            –{' '}
+                            {new Date(s.ends_at).toLocaleTimeString([], {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}
+                          </small>
+                        </button>
                       ))}
                       {departments.length > 0 && (
                         <button
@@ -183,6 +227,50 @@ export function Schedules(_: { path?: string }) {
           </div>
         </div>
       </section>
+      {selectedShift && (
+        <Modal title={selectedShift.title} onClose={() => setSelectedShift(null)}>
+          <p>
+            {selectedShift.department} · {selectedShift.event}
+          </p>
+          <p>
+            {date(selectedShift.starts_at, true, timezone)} –{' '}
+            {date(selectedShift.ends_at, true, timezone)}
+          </p>
+          {selectedShift.location_label && <p>{selectedShift.location_label}</p>}
+          <p>
+            {selectedShift.assigned_count} of {selectedShift.slots} places filled
+          </p>
+          <p>
+            {selectedShift.assigned.map((person: Row) => person.display_name).join(', ') ||
+              'No one assigned yet'}
+          </p>
+          {selectedShift.can_manage && selectedShift.assigned_count < selectedShift.slots && (
+            <button
+              type="button"
+              class="button primary"
+              onClick={() => {
+                setAssign(selectedShift);
+                setSelectedShift(null);
+              }}
+            >
+              Assign staff
+            </button>
+          )}
+          {!selectedShift.claimed_by_me &&
+            selectedShift.assigned_count < selectedShift.slots &&
+            me.user.volunteer_eligible && (
+              <Action
+                action={async () => {
+                  await api('/schedules/' + selectedShift.id + '/claim', 'POST', {});
+                  setSelectedShift(null);
+                  refresh();
+                }}
+              >
+                Claim opening
+              </Action>
+            )}
+        </Modal>
+      )}
       {error ? (
         <ErrorBox message={error} />
       ) : loading ? (
@@ -196,8 +284,8 @@ export function Schedules(_: { path?: string }) {
                 {s.department} · {s.event}
               </p>
               <p>
-                <Icon name="calendar" size={16} /> {date(s.starts_at, true)} –{' '}
-                {date(s.ends_at, true)}
+                <Icon name="calendar" size={16} /> {date(s.starts_at, true, timezone)} –{' '}
+                {date(s.ends_at, true, timezone)}
               </p>
               {s.location_label && <p>{s.location_label}</p>}
               <p>
@@ -291,7 +379,9 @@ export function Schedules(_: { path?: string }) {
                               new Date(copyShift.starts_at).getTime()),
                         ),
                       )
-                    : undefined,
+                    : selectedStart
+                      ? localInput(new Date(new Date(selectedStart).getTime() + 60 * 60 * 1000))
+                      : undefined,
               },
               { name: 'location_label', label: 'Location', value: copyShift?.location_label },
               {
