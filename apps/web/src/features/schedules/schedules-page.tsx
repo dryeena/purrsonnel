@@ -29,6 +29,8 @@ export function Schedules(_: { path?: string }) {
       return d;
     }),
     [selectedStart, setSelectedStart] = useState(''),
+    [lastShift, setLastShift] = useState<Row | null>(null),
+    [copyShift, setCopyShift] = useState<Row | null>(null),
     [assign, setAssign] = useState<Row | null>(null);
   const { data: org } = useData<Row>('/organization/tree'),
     { data, error, loading } = useData<Row[]>(
@@ -60,7 +62,8 @@ export function Schedules(_: { path?: string }) {
     ].join('-') +
     'T' +
     String(d.getHours()).padStart(2, '0') +
-    ':00';
+    ':' +
+    String(d.getMinutes()).padStart(2, '0');
   return (
     <>
       <PageHead
@@ -74,6 +77,7 @@ export function Schedules(_: { path?: string }) {
             class="button primary"
             onClick={() => {
               setSelectedStart('');
+              setCopyShift(null);
               setAdd(true);
             }}
           >
@@ -93,6 +97,11 @@ export function Schedules(_: { path?: string }) {
         </select>
       </label>
       <section class="schedule-calendar" aria-label="Weekly shift calendar">
+        {departments.length > 0 && (
+          <p class="small-note">
+            Hold Shift while selecting a time to copy your last created shift.
+          </p>
+        )}
         <div class="schedule-calendar-header">
           <button
             type="button"
@@ -157,8 +166,9 @@ export function Schedules(_: { path?: string }) {
                         <button
                           type="button"
                           aria-label={'Add shift ' + slot.toLocaleString()}
-                          onClick={() => {
+                          onClick={(event) => {
                             setSelectedStart(localInput(slot));
+                            setCopyShift(event.shiftKey ? lastShift : null);
                             setAdd(true);
                           }}
                         >
@@ -248,7 +258,7 @@ export function Schedules(_: { path?: string }) {
                 label: 'Event',
                 type: 'select',
                 required: true,
-                value: eventId,
+                value: copyShift?.event_edition_id || eventId,
                 options: org?.events.map((e: Row) => ({ value: e.id, label: e.name })),
               },
               {
@@ -256,9 +266,10 @@ export function Schedules(_: { path?: string }) {
                 label: 'Department',
                 type: 'select',
                 required: true,
+                value: copyShift?.department_id,
                 options: departments.map((d: Row) => ({ value: d.id, label: d.name })),
               },
-              { name: 'title', label: 'Shift title', required: true },
+              { name: 'title', label: 'Shift title', required: true, value: copyShift?.title },
               {
                 name: 'starts_at',
                 label: 'Starts',
@@ -266,14 +277,29 @@ export function Schedules(_: { path?: string }) {
                 required: true,
                 value: selectedStart,
               },
-              { name: 'ends_at', label: 'Ends', type: 'datetime-local', required: true },
-              { name: 'location_label', label: 'Location' },
+              {
+                name: 'ends_at',
+                label: 'Ends',
+                type: 'datetime-local',
+                required: true,
+                value:
+                  copyShift && selectedStart
+                    ? localInput(
+                        new Date(
+                          new Date(selectedStart).getTime() +
+                            (new Date(copyShift.ends_at).getTime() -
+                              new Date(copyShift.starts_at).getTime()),
+                        ),
+                      )
+                    : undefined,
+              },
+              { name: 'location_label', label: 'Location', value: copyShift?.location_label },
               {
                 name: 'slots',
                 label: 'Openings',
                 type: 'number',
                 required: true,
-                value: 1,
+                value: copyShift?.slots ?? 1,
                 min: 1,
                 max: 200,
               },
@@ -284,6 +310,7 @@ export function Schedules(_: { path?: string }) {
                 starts_at: new Date(b.starts_at).toISOString(),
                 ends_at: new Date(b.ends_at).toISOString(),
               });
+              setLastShift({ ...b });
               setAdd(false);
               refresh();
             }}

@@ -136,4 +136,48 @@ describe('schedules', () => {
     const starts = screen.getByLabelText(/^Starts/) as HTMLInputElement;
     expect(starts.value).toMatch(/T00:00$/);
   });
+  it('copies the last created shift into a Shift-clicked time slot', async () => {
+    const lead = {
+      ...identity,
+      grants: [{ permission: 'people.edit', scope_type: 'global' as const, scope_id: null }],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, options: RequestInit) => {
+        if (options.method === 'POST') return Promise.resolve(new Response('{"id":"created"}'));
+        return Promise.resolve(
+          url.endsWith('/organization/tree')
+            ? new Response(
+                '{"departments":[{"id":"reg","name":"Registration"}],"events":[{"id":"event","name":"FWA"}]}',
+              )
+            : new Response('[]'),
+        );
+      }),
+    );
+    render(
+      <AuthContext.Provider value={lead}>
+        <Schedules />
+      </AuthContext.Provider>,
+    );
+    const slots = await screen.findAllByRole('button', { name: /^Add shift / });
+    fireEvent.click(slots[0]);
+    fireEvent.change(screen.getAllByLabelText(/^Event/)[1], { target: { value: 'event' } });
+    fireEvent.change(screen.getByLabelText(/^Department/), { target: { value: 'reg' } });
+    fireEvent.input(screen.getByLabelText(/^Shift title/), { target: { value: 'Welcome desk' } });
+    const starts = (screen.getByLabelText(/^Starts/) as HTMLInputElement).value;
+    const end = new Date(starts);
+    end.setHours(end.getHours() + 2);
+    const endValue = starts.slice(0, 11) + String(end.getHours()).padStart(2, '0') + ':00';
+    fireEvent.input(screen.getByLabelText(/^Ends/), { target: { value: endValue } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Publish shift' }).closest('form')!);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    fireEvent.click(slots[1], { shiftKey: true });
+    expect((screen.getByLabelText(/^Shift title/) as HTMLInputElement).value).toBe('Welcome desk');
+    const copiedStart = (screen.getByLabelText(/^Starts/) as HTMLInputElement).value;
+    const copiedEnd = (screen.getByLabelText(/^Ends/) as HTMLInputElement).value;
+    expect(new Date(copiedEnd).getTime() - new Date(copiedStart).getTime()).toBe(
+      2 * 60 * 60 * 1000,
+    );
+    expect(copiedStart).not.toBe(starts);
+  });
 });
