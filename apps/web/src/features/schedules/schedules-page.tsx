@@ -1,18 +1,7 @@
-/* eslint-disable max-lines -- The calendar and its linked dialogs share state. */
 import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 
-import {
-  Action,
-  Empty,
-  ErrorBox,
-  Form,
-  Icon,
-  Loading,
-  Modal,
-  PageHead,
-  Panel,
-} from '../../components/ui';
+import { Action, Empty, ErrorBox, Form, Icon, Loading, Modal, PageHead } from '../../components/ui';
 import { useData } from '../../hooks/use-data';
 import { useAuth } from '../../lib/auth';
 import { date } from '../../lib/date';
@@ -67,6 +56,25 @@ export function Schedules(_: { path?: string }) {
     ':' +
     String(d.getMinutes()).padStart(2, '0');
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const colors = [
+    '#704581',
+    '#276a87',
+    '#a34c36',
+    '#487b4a',
+    '#8c5e12',
+    '#a33f69',
+    '#5261a4',
+    '#13796d',
+    '#945e88',
+    '#7b643f',
+    '#4d7090',
+    '#a34d52',
+  ];
+  const departmentColor = (id: string) => {
+    let hash = 0;
+    for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+    return colors[hash % colors.length];
+  };
   return (
     <>
       <PageHead
@@ -190,9 +198,15 @@ export function Schedules(_: { path?: string }) {
                           type="button"
                           key={s.id}
                           class="schedule-slot-shift"
+                          style={{
+                            borderLeftColor: departmentColor(s.department_id || s.department || ''),
+                            backgroundColor:
+                              departmentColor(s.department_id || s.department || '') + '22',
+                          }}
                           onClick={() => setSelectedShift(s)}
                         >
                           <strong>{s.title}</strong>
+                          <small>{s.department}</small>
                           <small>
                             {new Date(s.starts_at).toLocaleTimeString([], {
                               hour: 'numeric',
@@ -275,46 +289,9 @@ export function Schedules(_: { path?: string }) {
         <ErrorBox message={error} />
       ) : loading ? (
         <Loading />
-      ) : data?.length ? (
-        <div class="card-grid">
-          {data.map((s) => (
-            <Panel key={s.id}>
-              <strong>{s.title}</strong>
-              <p>
-                {s.department} · {s.event}
-              </p>
-              <p>
-                <Icon name="calendar" size={16} /> {date(s.starts_at, true, timezone)} –{' '}
-                {date(s.ends_at, true, timezone)}
-              </p>
-              {s.location_label && <p>{s.location_label}</p>}
-              <p>
-                {s.assigned_count}/{s.slots} filled
-              </p>
-              <p class="small-note">
-                {s.assigned.map((u: Row) => u.display_name).join(', ') || 'Open shift'}
-              </p>
-              {s.can_manage && s.assigned_count < s.slots && (
-                <button type="button" class="button secondary" onClick={() => setAssign(s)}>
-                  Assign staff
-                </button>
-              )}
-              {!s.claimed_by_me && s.assigned_count < s.slots && me.user.volunteer_eligible && (
-                <Action
-                  action={async () => {
-                    await api('/schedules/' + s.id + '/claim', 'POST', {});
-                    refresh();
-                  }}
-                >
-                  Claim opening
-                </Action>
-              )}
-            </Panel>
-          ))}
-        </div>
-      ) : (
+      ) : !data?.length ? (
         <Empty title="No shifts scheduled yet">Choose an event and add the first shift.</Empty>
-      )}
+      ) : null}
       {assign && (
         <Modal title="Assign staff" onClose={() => setAssign(null)}>
           <Form

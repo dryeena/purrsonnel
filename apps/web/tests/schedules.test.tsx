@@ -32,6 +32,41 @@ function showSchedule(response: Response) {
   );
 }
 describe('schedules', () => {
+  it('uses a consistent color for each department without duplicating shifts', async () => {
+    const start = new Date();
+    start.setHours(10, 0, 0, 0);
+    const shift = {
+      department: 'Registration',
+      department_id: 'reg',
+      event: 'FWA',
+      starts_at: start.toISOString(),
+      ends_at: new Date(start.getTime() + 3600000).toISOString(),
+      assigned: [],
+      assigned_count: 0,
+      slots: 1,
+    };
+    showSchedule(
+      new Response(
+        JSON.stringify([
+          { ...shift, id: 'one', title: 'First' },
+          { ...shift, id: 'two', title: 'Second' },
+          {
+            ...shift,
+            id: 'three',
+            title: 'Third',
+            department: 'Programming',
+            department_id: 'prog',
+          },
+        ]),
+      ),
+    );
+    const first = await screen.findByRole('button', { name: /First/ });
+    const second = screen.getByRole('button', { name: /Second/ });
+    const third = screen.getByRole('button', { name: /Third/ });
+    expect(first.style.borderLeftColor).toBe(second.style.borderLeftColor);
+    expect(first.style.borderLeftColor).not.toBe(third.style.borderLeftColor);
+    expect(screen.getAllByText('First')).toHaveLength(1);
+  });
   it('starts the selected event week on the day before the event', async () => {
     vi.stubGlobal(
       'fetch',
@@ -81,7 +116,7 @@ describe('schedules', () => {
     const card = await screen.findByRole('button', { name: /Desk coverage/ });
     fireEvent.click(card);
     expect(screen.getByRole('dialog', { name: 'Desk coverage' })).toBeVisible();
-    expect(screen.getAllByRole('button', { name: 'Claim opening' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Claim opening' })).toHaveLength(1);
   });
   it('shows an empty state when there are no shifts', async () => {
     showSchedule(new Response('[]'));
@@ -92,6 +127,8 @@ describe('schedules', () => {
     expect(await screen.findByText('Schedule unavailable')).toBeVisible();
   });
   it('shows a volunteer an available opening', async () => {
+    const start = new Date();
+    start.setHours(10, 0, 0, 0);
     showSchedule(
       new Response(
         JSON.stringify([
@@ -100,8 +137,8 @@ describe('schedules', () => {
             title: 'Welcome',
             department: 'Registration',
             event: 'FWA',
-            starts_at: '2027-05-01T10:00:00Z',
-            ends_at: '2027-05-01T12:00:00Z',
+            starts_at: start.toISOString(),
+            ends_at: new Date(start.getTime() + 7200000).toISOString(),
             assigned: [],
             assigned_count: 0,
             slots: 1,
@@ -111,10 +148,13 @@ describe('schedules', () => {
       ),
     );
     expect(await screen.findByText('Welcome')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /Welcome/ }));
     expect(screen.getByRole('button', { name: 'Claim opening' })).toBeVisible();
   });
   it('allows a lead to assign staff from another department', async () => {
     const lead = { ...identity, user: { id: 'lead', volunteer_eligible: false } };
+    const start = new Date();
+    start.setHours(10, 0, 0, 0);
     const fetcher = vi.fn().mockImplementation((url: string, options: RequestInit) => {
       if (options.method === 'POST') return Promise.resolve(new Response('{"ok":true}'));
       if (url.endsWith('/organization/tree'))
@@ -130,8 +170,8 @@ describe('schedules', () => {
               title: 'Welcome',
               department: 'Registration',
               event: 'FWA',
-              starts_at: '2027-05-01T10:00:00Z',
-              ends_at: '2027-05-01T12:00:00Z',
+              starts_at: start.toISOString(),
+              ends_at: new Date(start.getTime() + 7200000).toISOString(),
               assigned: [],
               assigned_count: 0,
               slots: 1,
@@ -147,7 +187,8 @@ describe('schedules', () => {
         <Schedules />
       </AuthContext.Provider>,
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Assign staff' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Welcome/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Assign staff' }));
     const picker = await screen.findByRole('combobox', { name: 'Staff member' });
     await screen.findByRole('option', { name: 'River Wolf' });
     fireEvent.change(picker, { target: { value: 'staff' } });
