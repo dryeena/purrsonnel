@@ -99,7 +99,7 @@ export function Schedules(_: { path?: string }) {
             if (event?.starts_at) {
               const start = new Date(event.starts_at);
               start.setHours(0, 0, 0, 0);
-              start.setDate(start.getDate() - start.getDay());
+              start.setDate(start.getDate() - 1);
               setWeek(start);
             }
           }}

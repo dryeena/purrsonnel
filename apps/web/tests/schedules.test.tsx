@@ -32,6 +32,30 @@ function showSchedule(response: Response) {
   );
 }
 describe('schedules', () => {
+  it('starts the selected event week on the day before the event', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementation((url: string) =>
+          Promise.resolve(
+            url.endsWith('/organization/tree')
+              ? new Response(
+                  '{"departments":[],"events":[{"id":"event","name":"FWA","starts_at":"2027-05-07T12:00:00"}]}',
+                )
+              : new Response('[]'),
+          ),
+        ),
+    );
+    render(
+      <AuthContext.Provider value={identity}>
+        <Schedules />
+      </AuthContext.Provider>,
+    );
+    await screen.findByRole('option', { name: 'FWA' });
+    fireEvent.change(screen.getByLabelText('Event'), { target: { value: 'event' } });
+    expect(screen.getByText(/5\/6\/2027.*5\/12\/2027/)).toBeVisible();
+  });
   it('opens shift details directly from the weekly calendar', async () => {
     const start = new Date();
     start.setHours(10, 0, 0, 0);
