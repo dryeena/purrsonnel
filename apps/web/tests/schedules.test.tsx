@@ -108,4 +108,32 @@ describe('schedules', () => {
       ),
     );
   });
+  it('opens shift creation with the selected calendar day and time', async () => {
+    const lead = {
+      ...identity,
+      grants: [{ permission: 'people.edit', scope_type: 'global' as const, scope_id: null }],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementation((url: string) =>
+          Promise.resolve(
+            url.endsWith('/organization/tree')
+              ? new Response('{"departments":[{"id":"reg","name":"Registration"}],"events":[]}')
+              : new Response('[]'),
+          ),
+        ),
+    );
+    render(
+      <AuthContext.Provider value={lead}>
+        <Schedules />
+      </AuthContext.Provider>,
+    );
+    const slots = await screen.findAllByRole('button', { name: /^Add shift / });
+    expect(slots).toHaveLength(168);
+    fireEvent.click(slots[0]);
+    const starts = screen.getByLabelText(/^Starts/) as HTMLInputElement;
+    expect(starts.value).toMatch(/T00:00$/);
+  });
 });

@@ -1,3 +1,4 @@
+import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 
 import {
@@ -21,6 +22,13 @@ export function Schedules(_: { path?: string }) {
   const me = useAuth(),
     [eventId, setEventId] = useState(''),
     [add, setAdd] = useState(false),
+    [week, setWeek] = useState(() => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - d.getDay());
+      return d;
+    }),
+    [selectedStart, setSelectedStart] = useState(''),
     [assign, setAssign] = useState<Row | null>(null);
   const { data: org } = useData<Row>('/organization/tree'),
     { data, error, loading } = useData<Row[]>(
@@ -39,6 +47,20 @@ export function Schedules(_: { path?: string }) {
             (g.scope_type === 'division' && g.scope_id === d.division_id)),
       ),
     ) || [];
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(week);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+  const localInput = (d: Date) =>
+    [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0'),
+    ].join('-') +
+    'T' +
+    String(d.getHours()).padStart(2, '0') +
+    ':00';
   return (
     <>
       <PageHead
@@ -47,7 +69,14 @@ export function Schedules(_: { path?: string }) {
         description="Plan coverage, share openings, and see where everyone needs to be."
       >
         {departments.length > 0 && (
-          <button type="button" class="button primary" onClick={() => setAdd(true)}>
+          <button
+            type="button"
+            class="button primary"
+            onClick={() => {
+              setSelectedStart('');
+              setAdd(true);
+            }}
+          >
             <Icon name="plus" size={16} /> Add shift
           </button>
         )}
@@ -63,6 +92,87 @@ export function Schedules(_: { path?: string }) {
           ))}
         </select>
       </label>
+      <section class="schedule-calendar" aria-label="Weekly shift calendar">
+        <div class="schedule-calendar-header">
+          <button
+            type="button"
+            class="button secondary"
+            onClick={() =>
+              setWeek(new Date(week.getFullYear(), week.getMonth(), week.getDate() - 7))
+            }
+          >
+            Previous week
+          </button>
+          <strong>
+            {days[0].toLocaleDateString()} – {days[6].toLocaleDateString()}
+          </strong>
+          <button
+            type="button"
+            class="button secondary"
+            onClick={() =>
+              setWeek(new Date(week.getFullYear(), week.getMonth(), week.getDate() + 7))
+            }
+          >
+            Next week
+          </button>
+        </div>
+        <div class="schedule-calendar-scroll">
+          <div class="schedule-calendar-grid">
+            <span>Time</span>
+            {days.map((d) => (
+              <strong key={d.toISOString()}>
+                {d.toLocaleDateString(undefined, {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </strong>
+            ))}
+            {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+              <Fragment key={hour}>
+                <span key={'hour-' + hour}>
+                  {hour % 12 || 12} {hour < 12 ? 'AM' : 'PM'}
+                </span>
+                {days.map((day) => {
+                  const slot = new Date(day);
+                  slot.setHours(hour);
+                  const shifts =
+                    data?.filter((s) => {
+                      const starts = new Date(s.starts_at);
+                      return (
+                        starts.getFullYear() === slot.getFullYear() &&
+                        starts.getMonth() === slot.getMonth() &&
+                        starts.getDate() === slot.getDate() &&
+                        starts.getHours() === hour
+                      );
+                    }) || [];
+                  return (
+                    <div class="schedule-slot" key={localInput(slot)}>
+                      {shifts.map((s) => (
+                        <span key={s.id} class="schedule-slot-shift">
+                          {s.title}
+                        </span>
+                      ))}
+                      {departments.length > 0 && (
+                        <button
+                          type="button"
+                          aria-label={'Add shift ' + slot.toLocaleString()}
+                          onClick={() => {
+                            setSelectedStart(localInput(slot));
+                            setAdd(true);
+                          }}
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      </section>
       {error ? (
         <ErrorBox message={error} />
       ) : loading ? (
@@ -138,6 +248,7 @@ export function Schedules(_: { path?: string }) {
                 label: 'Event',
                 type: 'select',
                 required: true,
+                value: eventId,
                 options: org?.events.map((e: Row) => ({ value: e.id, label: e.name })),
               },
               {
@@ -148,7 +259,13 @@ export function Schedules(_: { path?: string }) {
                 options: departments.map((d: Row) => ({ value: d.id, label: d.name })),
               },
               { name: 'title', label: 'Shift title', required: true },
-              { name: 'starts_at', label: 'Starts', type: 'datetime-local', required: true },
+              {
+                name: 'starts_at',
+                label: 'Starts',
+                type: 'datetime-local',
+                required: true,
+                value: selectedStart,
+              },
               { name: 'ends_at', label: 'Ends', type: 'datetime-local', required: true },
               { name: 'location_label', label: 'Location' },
               {
