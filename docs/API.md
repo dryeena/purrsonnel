@@ -2,7 +2,7 @@
 
 All feature routes are under `/api/v1`. Browser requests use same-origin cookie authentication; mutations require configured `Origin` and `X-CSRF-Token`. Use `Content-Type: application/json`. No request may provide an actor ID to impersonate the current principal, other than the explicit development-only switch endpoint. Errors use `{ "type":"about:blank", "title":"Conflict", "status":409, "detail":"…" }`.
 
-`GET /health/live` checks process liveness; `GET /health/ready` checks PostgreSQL. Health responses contain no credentials. `/api-docs/openapi.json` generates the health schema through Utoipa; this document is the full authenticated feature reference. No endpoint in this reference implies runtime verification has passed.
+`GET /health/live` checks process liveness; `GET /health/ready` checks PostgreSQL. Health responses contain no credentials. Swagger UI is served at `/swagger/` and loads `/api-docs/openapi.json`. Sign in to the application in the same browser and supply the CSRF token from `/api/v1/auth/me` through Swagger's authorization dialog for mutations. The OpenAPI document currently describes selected operations; this document remains the broader feature reference.
 
 List routes accept `page` (1-based) and `page_size` (1–100) where indicated. Users return `{items,total,page,page_size}`. Other feature lists return arrays; request the next page until fewer than `page_size` records are returned. Organization/configuration catalogs are bounded by their natural organization scope. Audit/bulk histories have explicit page/record limits. An API call that is not listed here is not implemented.
 

@@ -1,6 +1,16 @@
 import { useState } from 'preact/hooks';
 
-import { Empty, ErrorBox, Form, Icon, Loading, Modal, PageHead, Panel } from '../../components/ui';
+import {
+  Action,
+  Empty,
+  ErrorBox,
+  Form,
+  Icon,
+  Loading,
+  Modal,
+  PageHead,
+  Panel,
+} from '../../components/ui';
 import { useData } from '../../hooks/use-data';
 import { useAuth } from '../../lib/auth';
 import { date } from '../../lib/date';
@@ -10,11 +20,15 @@ import type { Row } from '../../types/api';
 export function Schedules(_: { path?: string }) {
   const me = useAuth(),
     [eventId, setEventId] = useState(''),
-    [add, setAdd] = useState(false);
+    [add, setAdd] = useState(false),
+    [assign, setAssign] = useState<Row | null>(null);
   const { data: org } = useData<Row>('/organization/tree'),
     { data, error, loading } = useData<Row[]>(
       '/schedules' + (eventId ? '?event_id=' + eventId : ''),
     );
+  const { data: people } = useData<Row[]>(
+    assign ? '/schedules/staff?department_id=' + assign.department_id : null,
+  );
   const departments =
     org?.departments.filter((d: Row) =>
       me.grants.some(
@@ -62,31 +76,57 @@ export function Schedules(_: { path?: string }) {
                 {s.department} · {s.event}
               </p>
               <p>
-                <Icon name="calendar" size={16} /> {date(s.starts_at, true)}
+                <Icon name="calendar" size={16} /> {date(s.starts_at, true)} –{' '}
+                {date(s.ends_at, true)}
               </p>
+              {s.location_label && <p>{s.location_label}</p>}
               <p>
                 {s.assigned_count}/{s.slots} filled
               </p>
               <p class="small-note">
                 {s.assigned.map((u: Row) => u.display_name).join(', ') || 'Open shift'}
               </p>
+              {s.can_manage && s.assigned_count < s.slots && (
+                <button type="button" class="button secondary" onClick={() => setAssign(s)}>
+                  Assign staff
+                </button>
+              )}
               {!s.claimed_by_me && s.assigned_count < s.slots && me.user.volunteer_eligible && (
-                <button
-                  class="button secondary"
-                  type="button"
-                  onClick={async () => {
+                <Action
+                  action={async () => {
                     await api('/schedules/' + s.id + '/claim', 'POST', {});
                     refresh();
                   }}
                 >
                   Claim opening
-                </button>
+                </Action>
               )}
             </Panel>
           ))}
         </div>
       ) : (
         <Empty title="No shifts scheduled yet">Choose an event and add the first shift.</Empty>
+      )}
+      {assign && (
+        <Modal title="Assign staff" onClose={() => setAssign(null)}>
+          <Form
+            fields={[
+              {
+                name: 'user_id',
+                label: 'Staff member',
+                type: 'select',
+                required: true,
+                options: people?.map((p: Row) => ({ value: p.id, label: p.display_name })),
+              },
+            ]}
+            submit="Assign"
+            onSubmit={async (b) => {
+              await api('/schedules/' + assign.id + '/assignments', 'POST', b);
+              setAssign(null);
+              refresh();
+            }}
+          />
+        </Modal>
       )}
       {add && (
         <Modal title="Add a shift" onClose={() => setAdd(false)}>

@@ -39,6 +39,12 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
         <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12a20 20 0 0 0 18 0M12 11v4" />
       </>
     ),
+    interview: (
+      <>
+        <path d="M4 4h16v12H9l-5 4V4Z" />
+        <path d="M8 9h8m-8 3h5" />
+      </>
+    ),
     calendar: (
       <>
         <rect x="3" y="5" width="18" height="17" rx="2" />

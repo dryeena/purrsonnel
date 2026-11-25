@@ -23,6 +23,7 @@ impl MigratorTrait for Migrator {
    Box::new(SqlMigration{name:"m20261110_000006_policy_fields_and_signatures",sql:include_str!("../migrations/0006_policy_fields_and_signatures.sql")}),
    Box::new(SqlMigration{name:"m20261110_000007_people_page_profile_fields",sql:include_str!("../migrations/0007_people_page_profile_fields.sql")}),
    Box::new(SqlMigration{name:"m20261110_000008_event_schedules",sql:include_str!("../migrations/0008_event_schedules.sql")}),
+   Box::new(SqlMigration{name:"m20261124_000009_permission_thresholds",sql:include_str!("../migrations/0009_permission_thresholds.sql")}),
   ]
  }
 }

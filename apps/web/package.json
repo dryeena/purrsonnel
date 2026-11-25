@@ -17,7 +17,8 @@
   "dependencies": {
     "preact": "^10.26.0",
     "preact-router": "^4.1.2",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "swagger-ui-dist": "^5.36.0"
   },
   "devDependencies": {
     "@eslint-react/eslint-plugin": "^5.28.8",

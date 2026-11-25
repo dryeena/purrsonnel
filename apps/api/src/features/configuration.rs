@@ -6,6 +6,23 @@ use uuid::Uuid;
 use crate::{AppState,auth::Principal,error::{ApiError,Result},validation};
 use super::audit;
 pub const PERMISSIONS:&[&str]=&["requests.send","people.read","people.edit","people.bulk_update","people.read_sensitive","organization.manage","terms.manage","terms.read_compliance","volunteer.time.submit","volunteer.time.approve","volunteer.time.admin","positions.manage","applications.submit","applications.review","interviews.manage","interviews.decide","interviews.finalize","settings.manage","audit.read"];
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]pub struct Threshold {permission:String,minimum_rank:Option<i32>}
+pub async fn thresholds(State(s):State<AppState>,p:Principal)->Result<Json<Value>>{
+ use sea_orm::{ConnectionTrait,DbBackend,Statement};
+ p.require(&s,"settings.manage",None).await?;
+ let rows=s.db.query_all(Statement::from_string(DbBackend::Postgres,"SELECT jsonb_build_object('permission',permission,'minimum_rank',minimum_rank) FROM permission_thresholds ORDER BY permission".to_owned())).await?;
+ Ok(Json(json!(rows.into_iter().map(|r|r.try_get_by_index::<Value>(0)).collect::<std::result::Result<Vec<_>,_>>()?)))
+}
+pub async fn set_threshold(State(s):State<AppState>,p:Principal,Json(b):Json<Threshold>)->Result<Json<Value>>{
+ use sea_orm::{ConnectionTrait,DbBackend,Statement};
+ p.require(&s,"settings.manage",None).await?;
+ if !PERMISSIONS.contains(&b.permission.as_str())||b.minimum_rank.is_some_and(|n|!(1..=1000).contains(&n)){return Err(ApiError::bad("Invalid permission or minimum level"));}
+ let mut tx=s.db.begin().await?;
+ if let Some(rank)=b.minimum_rank {tx.execute(Statement::from_sql_and_values(DbBackend::Postgres,"INSERT INTO permission_thresholds(permission,minimum_rank) VALUES($1,$2) ON CONFLICT(permission) DO UPDATE SET minimum_rank=EXCLUDED.minimum_rank",vec![b.permission.clone().into(),rank.into()])).await?;}
+ else {tx.execute(Statement::from_sql_and_values(DbBackend::Postgres,"DELETE FROM permission_thresholds WHERE permission=$1",vec![b.permission.clone().into()])).await?;}
+ audit(&mut tx,p.id,"permission.threshold_updated","permission_threshold",p.id,Value::Null,json!({"permission":b.permission,"minimum_rank":b.minimum_rank})).await?;
+ tx.commit().await?;Ok(Json(json!({"ok":true})))
+}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]pub struct Grant {pub user_id:Uuid,pub permission:String,pub scope_type:String,pub scope_id:Option<Uuid>}
 pub async fn grants(State(s):State<AppState>,p:Principal)->Result<Json<Value>> {p.require(&s,"settings.manage",None).await?;Ok(Json(json!({"permissions":PERMISSIONS,"items":crate::repositories::configuration::grants_select_permission_grants::<_,Value>(&s.db).await?})))}
 pub async fn grant(State(s):State<AppState>,p:Principal,Json(b):Json<Grant>)->Result<Json<Value>>{

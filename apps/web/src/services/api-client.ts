@@ -31,7 +31,11 @@ export async function api<T = Row>(path: string, method = 'GET', body?: unknown)
         : 'You’re offline. Reconnect to load your workspace or save changes.',
     );
   }
-  const result = await response.json().catch(() => ({}));
+  if (response.status === 204) return undefined as T;
+  const result = await response.json().catch(() => {
+    if (response.ok) throw new Error('Purrsonnel returned an invalid or empty response.');
+    return {};
+  });
   if (!response.ok)
     throw new ApiError(response.status, result.detail || `Request failed (${response.status})`);
   return result as T;

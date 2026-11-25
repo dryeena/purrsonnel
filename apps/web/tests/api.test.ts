@@ -57,6 +57,14 @@ describe('session transport', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('Unavailable', { status: 502 })));
     await expect(api('/dashboard')).rejects.toThrow('Request failed (502)');
   });
+  it.each(['', '{broken'])('rejects an invalid successful response: %s', async (body) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 200 })));
+    await expect(api('/dashboard')).rejects.toThrow('invalid or empty response');
+  });
+  it('accepts an explicitly empty 204 response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+    await expect(api('/dashboard')).resolves.toBeUndefined();
+  });
 });
 describe('client permission hints', () => {
   it('shows scoped capabilities without treating them as global', () => {

@@ -32,7 +32,7 @@ const nav = [
   { label: 'Terms & policies', path: '/terms', icon: 'terms' },
   { label: 'Positions', path: '/positions', icon: 'briefcase' },
   { label: 'Applications', path: '/applications', icon: 'terms' },
-  { label: 'Interviews', path: '/interviews', icon: 'calendar' },
+  { label: 'Interviews', path: '/interviews', icon: 'interview' },
   { label: 'Schedules', path: '/schedules', icon: 'calendar' },
   { label: 'Lists & bulk actions', path: '/lists', icon: 'list', permission: 'people.bulk_update' },
   { label: 'Settings', path: '/settings', icon: 'settings', permission: 'settings.manage' },

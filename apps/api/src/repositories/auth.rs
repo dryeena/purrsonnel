@@ -117,11 +117,7 @@ pub async fn me_select_people_directory<C: ConnectionTrait, T: TryGetable>(db: &
 
 pub async fn me_select_permission_grants<C: ConnectionTrait, T: TryGetable>(db: &C, p1: impl Into<Value>) -> Result<Vec<T>, DbErr> {
     let p1: Value = p1.into();
-    let mut query = Query::select();
-    query.from(permission_grants::Entity);
-    query.expr(SimpleExpr::from(Func::cust(Alias::new("jsonb_build_object")).args([Expr::value("permission"), SimpleExpr::from(Expr::col(permission_grants::Column::Permission)), Expr::value("scope_type"), SimpleExpr::from(Expr::col(permission_grants::Column::ScopeType)), Expr::value("scope_id"), SimpleExpr::from(Expr::col(permission_grants::Column::ScopeId))])));
-    query.cond_where(Expr::expr(SimpleExpr::from(Expr::col(permission_grants::Column::UserId))).eq(Expr::value(p1.clone())));
-    let statement = db.get_database_backend().build(&query);
+    let statement = Statement::from_sql_and_values(DbBackend::Postgres,"SELECT jsonb_build_object('permission',permission,'scope_type',scope_type,'scope_id',scope_id) FROM permission_grants WHERE user_id=$1 UNION ALL SELECT jsonb_build_object('permission',t.permission,'scope_type','global','scope_id',NULL) FROM permission_thresholds t JOIN users u ON u.id=$1 JOIN personnel_levels l ON l.id=u.personnel_level_id WHERE u.status='active' AND l.active AND l.rank>=t.minimum_rank",vec![p1]);
     db.query_all(statement).await?.into_iter().map(|row| row.try_get_by_index(0)).collect()
 }
 

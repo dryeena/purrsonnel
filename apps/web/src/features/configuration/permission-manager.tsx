@@ -11,18 +11,52 @@ export function PermissionManager() {
   const me = useAuth();
   const { data, error } = useData<Row>('/permission-grants');
   const { data: org } = useData<Row>('/organization/tree');
+  const { data: thresholds } = useData<Row[]>('/permission-thresholds');
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState('global');
   return (
     <Panel
       title="Permission assignments"
-      description="Dedicated, audited access changes. Rank does not grant permissions."
+      description="Configure minimum levels and individual permission grants."
       action={
         <button type="button" class="text-link" onClick={() => setOpen(!open)}>
           + Grant permission
         </button>
       }
     >
+      <h3>Minimum level for a permission</h3>
+      <p class="small-note">
+        A minimum level grants this permission globally to active people at or above that number.
+        Individual grants still apply.
+      </p>
+      <Form
+        fields={[
+          {
+            name: 'permission',
+            label: 'Permission',
+            type: 'select',
+            required: true,
+            options: data?.permissions.map((p: string) => ({ value: p, label: p })),
+          },
+          {
+            name: 'minimum_rank',
+            label: 'Minimum level number (leave blank to remove)',
+            type: 'number',
+            min: 1,
+            max: 1000,
+          },
+        ]}
+        submit="Save minimum level"
+        onSubmit={async (b) => {
+          await api('/permission-thresholds', 'PUT', b);
+          refresh();
+        }}
+      />
+      {thresholds?.map((t) => (
+        <p key={t.permission}>
+          {t.permission.replaceAll('_', ' ')}: {t.minimum_rank}
+        </p>
+      ))}
       {error && <p class="error-box">{error}</p>}
       {open && (
         <div class="setting-content">

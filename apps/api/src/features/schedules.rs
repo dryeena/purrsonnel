@@ -9,6 +9,12 @@ use super::audit;
 
 fn stmt(sql:&str,values:Vec<Value>)->Statement{Statement::from_sql_and_values(DbBackend::Postgres,sql,values)}
 #[derive(Deserialize)]pub struct Filter{event_id:Option<Uuid>}
+#[derive(Deserialize)]pub struct StaffFilter{department_id:Uuid}
+pub async fn staff(State(s):State<AppState>,p:Principal,Query(f):Query<StaffFilter>)->Result<Json<JsonValue>>{
+ p.require(&s,"people.edit",Some(f.department_id)).await?;
+ let rows:Vec<JsonValue>=s.db.query_all(stmt("SELECT jsonb_build_object('id',id,'display_name',display_name) FROM users WHERE status='active' AND personnel_level_id IS NOT NULL ORDER BY display_name,id LIMIT 5000",vec![])).await?.into_iter().map(|r|r.try_get_by_index(0)).collect::<std::result::Result<_,_>>()?;
+ Ok(Json(json!(rows)))
+}
 pub async fn list(State(s):State<AppState>,p:Principal,Query(f):Query<Filter>)->Result<Json<JsonValue>>{
  let q="SELECT jsonb_build_object('id',x.id,'event_edition_id',x.event_edition_id,'event',e.name,'department_id',x.department_id,'department',d.name,'title',x.title,'starts_at',x.starts_at,'ends_at',x.ends_at,'location_label',x.location_label,'slots',x.slots,'assigned',COALESCE((SELECT jsonb_agg(jsonb_build_object('id',u.id,'display_name',u.display_name)) FROM event_shift_assignments a JOIN users u ON u.id=a.user_id WHERE a.shift_id=x.id),'[]'),'assigned_count',(SELECT count(*) FROM event_shift_assignments a WHERE a.shift_id=x.id),'can_manage',has_permission($1,'people.edit',x.department_id),'claimed_by_me',EXISTS(SELECT 1 FROM event_shift_assignments a WHERE a.shift_id=x.id AND a.user_id=$1)) FROM event_shifts x JOIN event_editions e ON e.id=x.event_edition_id JOIN departments d ON d.id=x.department_id WHERE ($2::uuid IS NULL OR x.event_edition_id=$2) AND (has_permission($1,'people.read',x.department_id) OR EXISTS(SELECT 1 FROM event_shift_assignments a WHERE a.shift_id=x.id AND a.user_id=$1) OR (e.active AND (SELECT volunteer_eligible FROM users WHERE id=$1))) ORDER BY x.starts_at,d.name";
  let rows:Vec<JsonValue>=s.db.query_all(stmt(q,vec![p.id.into(),f.event_id.into()])).await?.into_iter().map(|r|r.try_get_by_index(0)).collect::<std::result::Result<_,_>>()?;Ok(Json(json!(rows)))
@@ -22,6 +28,16 @@ pub async fn create(State(s):State<AppState>,p:Principal,Json(b):Json<Shift>)->R
  audit(&mut tx,p.id,"schedule.shift_created","event_shift",id,JsonValue::Null,json!({"department_id":b.department_id})).await?;tx.commit().await?;Ok(Json(json!({"id":id})))
 }
 pub async fn claim(State(s):State<AppState>,p:Principal,Path(id):Path<Uuid>)->Result<Json<JsonValue>>{
- let n=s.db.execute(stmt("INSERT INTO event_shift_assignments(shift_id,user_id) SELECT x.id,$2 FROM event_shifts x JOIN event_editions e ON e.id=x.event_edition_id JOIN users u ON u.id=$2 WHERE x.id=$1 AND e.active AND u.volunteer_eligible AND (SELECT count(*) FROM event_shift_assignments WHERE shift_id=x.id)<x.slots ON CONFLICT DO NOTHING",vec![id.into(),p.id.into()])).await?.rows_affected();
- if n==0{return Err(ApiError::conflict("This opening is no longer available"));}Ok(Json(json!({"ok":true})))
+ let tx=s.db.begin().await?;
+ tx.query_one(stmt("SELECT id FROM event_shifts WHERE id=$1 FOR UPDATE",vec![id.into()])).await?.ok_or_else(ApiError::missing)?;
+ let n=tx.execute(stmt("INSERT INTO event_shift_assignments(shift_id,user_id) SELECT x.id,$2 FROM event_shifts x JOIN event_editions e ON e.id=x.event_edition_id JOIN users u ON u.id=$2 WHERE x.id=$1 AND e.active AND u.status='active' AND u.volunteer_eligible AND u.personnel_level_id IS NULL AND (SELECT count(*) FROM event_shift_assignments WHERE shift_id=x.id)<x.slots ON CONFLICT DO NOTHING",vec![id.into(),p.id.into()])).await?.rows_affected();
+ if n==0{return Err(ApiError::conflict("This opening is no longer available"));}tx.commit().await?;Ok(Json(json!({"ok":true})))
+}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]pub struct Assignment{user_id:Uuid}
+pub async fn assign(State(s):State<AppState>,p:Principal,Path(id):Path<Uuid>,Json(b):Json<Assignment>)->Result<Json<JsonValue>>{
+ let mut tx=s.db.begin().await?;
+ let department:Uuid=tx.query_one(stmt("SELECT department_id FROM event_shifts WHERE id=$1 FOR UPDATE",vec![id.into()])).await?.ok_or_else(ApiError::missing)?.try_get_by_index(0)?;
+ p.require(&s,"people.edit",Some(department)).await?;
+ let n=tx.execute(stmt("INSERT INTO event_shift_assignments(shift_id,user_id,assigned_by_user_id) SELECT x.id,u.id,$3 FROM event_shifts x JOIN users u ON u.id=$2 WHERE x.id=$1 AND u.status='active' AND u.personnel_level_id IS NOT NULL AND (SELECT count(*) FROM event_shift_assignments WHERE shift_id=x.id)<x.slots ON CONFLICT DO NOTHING",vec![id.into(),b.user_id.into(),p.id.into()])).await?.rows_affected();
+ if n==0{return Err(ApiError::conflict("Shift is full or staff member is unavailable"));}audit(&mut tx,p.id,"schedule.assigned","event_shift",id,JsonValue::Null,json!({"user_id":b.user_id})).await?;tx.commit().await?;Ok(Json(json!({"ok":true})))
 }

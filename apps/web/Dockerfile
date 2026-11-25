@@ -12,5 +12,8 @@ RUN npm run lint && npm run format:check && npm run build
 FROM nginx:stable-alpine AS release
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /app/node_modules/swagger-ui-dist/swagger-ui-bundle.js /usr/share/nginx/html/swagger/
+COPY --from=build /app/node_modules/swagger-ui-dist/swagger-ui.css /usr/share/nginx/html/swagger/
+COPY swagger/index.html swagger/init.js /usr/share/nginx/html/swagger/
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=5 CMD wget -q -O /dev/null http://127.0.0.1:8080/health/live || exit 1

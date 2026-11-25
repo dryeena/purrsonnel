@@ -1,5 +1,7 @@
 # Testing strategy
 
+The Docker test stack runs isolated PostgreSQL-backed API tests and the frontend checks. The current suite includes schedule capacity and authorization tests, numeric permission thresholds, health endpoint behavior during database loss, and 1,000-session workload coverage. This is an in-process Axum/database workload, not a browser, network, or production-capacity certification. Run `docker compose -f docker-compose.test.yml run --rm api-test` and `docker compose -f docker-compose.test.yml run --rm web-test` to reproduce it.
+
 Frontend ESLint, Prettier, TypeScript, 78 tests across 10 files, and the Vite build now pass on the coding machine using project-contained tools. Rust/PostgreSQL suites, Docker startup and browser/device acceptance remain unexecuted. The frontend result is not a claim of a verified full-stack release.
 
 ## Automated layers

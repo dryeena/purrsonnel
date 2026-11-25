@@ -20,7 +20,100 @@ impl Harness{
  async fn submitted(&self,user:Uuid,dept:Uuid)->Uuid{sqlx::query_scalar("INSERT INTO volunteer_entries(volunteer_user_id,department_id,work_date,minutes_worked,work_description,status) VALUES($1,$2,current_date,90,'Test volunteer activity','submitted') RETURNING id").bind(user).bind(dept).fetch_one(&self.db).await.unwrap()}
 }
 
+#[sqlx::test(migrations="./migrations")]async fn health_and_api_reference_are_available(db:PgPool){
+ let h=Harness::new(db).await;
+ for path in ["/health/live","/health/ready","/api-docs/openapi.json"]{
+  let response=h.router.clone().oneshot(Request::builder().uri(path).header("host","localhost:5173").body(Body::empty()).unwrap()).await.unwrap();
+  assert_eq!(response.status(),StatusCode::OK,"{path}");
+  let bytes=response.into_body().collect().await.unwrap().to_bytes();let body:Value=serde_json::from_slice(&bytes).unwrap();
+  if path=="/api-docs/openapi.json"{assert!(body["paths"]["/api/v1/schedules"]["get"].is_object());assert!(body["components"]["securitySchemes"]["csrf"].is_object());assert_eq!(body["paths"]["/api/v1/schedules/staff"]["get"]["parameters"][0]["name"],"department_id");assert!(body["paths"]["/api/v1/schedules"]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]["slots"].is_object());}
+  else {assert!(body["status"].is_string());}
+ }
+}
+#[sqlx::test(migrations="./migrations")]async fn liveness_remains_available_when_database_is_unavailable(db:PgPool){
+ let h=Harness::new(db).await;
+ h.db.close().await;
+ for(path,expected) in [("/health/live",StatusCode::OK),("/health/ready",StatusCode::INTERNAL_SERVER_ERROR)]{
+  let response=h.router.clone().oneshot(Request::builder().uri(path).header("host","localhost:5173").body(Body::empty()).unwrap()).await.unwrap();
+  assert_eq!(response.status(),expected,"{path}");
+ }
+}
+
 #[sqlx::test(migrations="./migrations")]async fn auto_login_persists_and_does_not_expose_session_token(db:PgPool){let h=Harness::new(db).await;let s=h.login().await;let(status,b,_)=h.request("GET","/auth/me",Some(&s),Value::Null).await;assert_eq!(status,StatusCode::OK);assert_eq!(b["user"]["display_name"],"Juniper Fox");assert!(b["grants"].as_array().unwrap().iter().any(|g|g["permission"]=="people.bulk_update"));assert!(!b.to_string().contains(&s.cookie));let(_,_,cookie)=h.request("POST","/auth/dev/bootstrap",Some(&s),json!({})).await;assert!(cookie.is_none());}
+#[sqlx::test(migrations="./migrations")]async fn directory_paginates_one_thousand_people_without_loss(db:PgPool){
+ let h=Harness::new(db).await;let hr=h.login().await;
+ sqlx::query("INSERT INTO users(display_name,status) SELECT 'Load Person '||lpad(n::text,4,'0'),'active' FROM generate_series(1,1000) n").execute(&h.db).await.unwrap();
+ let mut seen=std::collections::HashSet::new();
+ for page in 1..=10 {let(status,body,_)=h.request("GET",&format!("/users?q=Load%20Person&page={page}&page_size=100"),Some(&hr),Value::Null).await;assert_eq!(status,StatusCode::OK,"{body}");for person in body["items"].as_array().unwrap(){assert!(seen.insert(person["id"].as_str().unwrap().to_string()));}}
+ assert_eq!(seen.len(),1000);
+}
+#[sqlx::test(migrations="./migrations")]async fn one_thousand_distinct_sessions_can_read_their_identity(db:PgPool){
+ let h=Harness::new(db).await;
+ let users:Vec<Uuid>=sqlx::query_scalar("INSERT INTO users(display_name,status) SELECT 'Concurrent User '||n,'active' FROM generate_series(1,1000) n RETURNING id").fetch_all(&h.db).await.unwrap();
+ let mut tasks=tokio::task::JoinSet::new();
+ let barrier=std::sync::Arc::new(tokio::sync::Barrier::new(1001));
+ for id in users {
+  let raw=Uuid::new_v4().to_string();
+  sqlx::query("INSERT INTO sessions(token_hash,user_id,csrf_token,expires_at) VALUES($1,$2,'test',now()+interval '1 hour')").bind(purrsonnel_api::auth::hash(&raw)).bind(id).execute(&h.db).await.unwrap();
+  let router=h.router.clone();
+  let barrier=barrier.clone();
+  tasks.spawn(async move{
+   barrier.wait().await;
+   let mut results=Vec::new();
+   for path in ["/api/v1/auth/me","/api/v1/dashboard","/api/v1/organization/tree","/api/v1/schedules"] {
+    let req=Request::builder().method("GET").uri(path).header("host","localhost:5173").header("cookie",format!("purrsonnel_session={raw}")).body(Body::empty()).unwrap();
+    let response=router.clone().oneshot(req).await.unwrap();
+    let status=response.status();let bytes=response.into_body().collect().await.unwrap().to_bytes();
+    let body:Value=serde_json::from_slice(&bytes).unwrap();
+    results.push((path,status,body));
+   }
+   (id,results)
+  });
+ }
+ barrier.wait().await;
+ let mut completed=0;
+ while let Some(result)=tasks.join_next().await {let(id,results)=result.unwrap();for(path,status,body)in results{assert_eq!(status,StatusCode::OK,"{path}: {body}");if path=="/api/v1/auth/me"{assert_eq!(body["user"]["id"],id.to_string());}}completed+=1;}
+ assert_eq!(completed,1000);
+}
+#[sqlx::test(migrations="./migrations")]async fn schedules_validate_requests_and_enforce_capacity(db:PgPool){
+ let h=Harness::new(db).await;let hr=h.login().await;
+ let event:Uuid=sqlx::query_scalar("SELECT id FROM event_editions WHERE active LIMIT 1").fetch_one(&h.db).await.unwrap();
+ let dept=h.dept("Registration").await;
+ let body=json!({"event_edition_id":event,"department_id":dept,"title":"Welcome","starts_at":"2027-05-01T10:00:00Z","ends_at":"2027-05-01T12:00:00Z","slots":1});
+ assert_eq!(h.request("POST","/schedules",Some(&hr),json!({})).await.0,StatusCode::UNPROCESSABLE_ENTITY);
+ let mut invalid=body.clone();invalid["slots"]=json!(0);
+ assert_eq!(h.request("POST","/schedules",Some(&hr),invalid).await.0,StatusCode::BAD_REQUEST);
+ let(status,shift,_)=h.request("POST","/schedules",Some(&hr),body).await;assert_eq!(status,StatusCode::OK,"{shift}");
+ let id=shift["id"].as_str().unwrap();let volunteer=h.switch(&hr,"volunteer").await;
+ assert_eq!(h.request("POST",&format!("/schedules/{id}/claim"),Some(&volunteer),json!({})).await.0,StatusCode::OK);
+ let other=h.switch(&volunteer,"volunteer2").await;
+ assert_eq!(h.request("POST",&format!("/schedules/{id}/claim"),Some(&other),json!({})).await.0,StatusCode::CONFLICT);
+}
+#[sqlx::test(migrations="./migrations")]async fn competing_volunteers_cannot_overfill_a_shift(db:PgPool){
+ let h=Harness::new(db).await;let hr=h.login().await;
+ let event:Uuid=sqlx::query_scalar("SELECT id FROM event_editions WHERE active LIMIT 1").fetch_one(&h.db).await.unwrap();
+ let(_,shift,_)=h.request("POST","/schedules",Some(&hr),json!({"event_edition_id":event,"department_id":h.dept("Registration").await,"title":"Coverage","starts_at":"2027-05-01T10:00:00Z","ends_at":"2027-05-01T12:00:00Z","slots":1})).await;
+ let first=h.switch(&hr,"volunteer").await;let another=h.login().await;let second=h.switch(&another,"volunteer2").await;
+ let path=format!("/schedules/{}/claim",shift["id"].as_str().unwrap());
+ let (a,b)=tokio::join!(h.request("POST",&path,Some(&first),json!({})),h.request("POST",&path,Some(&second),json!({})));
+ let mut statuses=[a.0,b.0];statuses.sort();assert_eq!(statuses,[StatusCode::OK,StatusCode::CONFLICT]);
+}
+#[sqlx::test(migrations="./migrations")]async fn leads_assign_staff_from_another_department_and_cannot_overfill(db:PgPool){
+ let h=Harness::new(db).await;let hr=h.login().await;let lead=h.switch(&hr,"lead").await;
+ let event:Uuid=sqlx::query_scalar("SELECT id FROM event_editions WHERE active LIMIT 1").fetch_one(&h.db).await.unwrap();
+ let(status,shift,_)=h.request("POST","/schedules",Some(&lead),json!({"event_edition_id":event,"department_id":h.dept("Registration").await,"title":"Coverage","starts_at":"2027-05-01T10:00:00Z","ends_at":"2027-05-01T12:00:00Z","slots":1})).await;assert_eq!(status,StatusCode::OK,"{shift}");
+ let path=format!("/schedules/{}/assignments",shift["id"].as_str().unwrap());
+ assert_eq!(h.request("POST",&path,Some(&lead),json!({})).await.0,StatusCode::UNPROCESSABLE_ENTITY);
+ assert_eq!(h.request("POST",&path,Some(&lead),json!({"user_id":"not-a-uuid"})).await.0,StatusCode::UNPROCESSABLE_ENTITY);
+ assert_eq!(h.request("POST",&path,Some(&lead),json!({"user_id":h.id("volunteer").await})).await.0,StatusCode::CONFLICT);
+ let(status,staff_list,_)=h.request("GET",&format!("/schedules/staff?department_id={}",h.dept("Registration").await),Some(&lead),Value::Null).await;
+ let other_staff=h.id("staff2").await.to_string();
+ assert_eq!(status,StatusCode::OK,"{staff_list}");assert!(staff_list.as_array().unwrap().iter().any(|p|p["id"]==other_staff));
+ assert_eq!(h.request("POST",&path,Some(&lead),json!({"user_id":h.id("staff2").await})).await.0,StatusCode::OK);
+ assert_eq!(h.request("POST",&path,Some(&lead),json!({"user_id":h.id("staff").await})).await.0,StatusCode::CONFLICT);
+ let staff=h.switch(&lead,"staff").await;
+ assert_eq!(h.request("POST",&path,Some(&staff),json!({"user_id":h.id("staff").await})).await.0,StatusCode::FORBIDDEN);
+}
 #[sqlx::test(migrations="./migrations")]async fn cookies_have_required_security_flags(db:PgPool){let h=Harness::new(db).await;let req=Request::builder().method("POST").uri("/api/v1/auth/dev/bootstrap").header("host","localhost:5173").header("origin","http://localhost:5173").body(Body::empty()).unwrap();let r=h.router.oneshot(req).await.unwrap();let cookie=r.headers()["set-cookie"].to_str().unwrap();for value in ["HttpOnly","SameSite=Lax","Path=/","Max-Age=43200"]{assert!(cookie.contains(value));}}
 #[sqlx::test(migrations="./migrations")]async fn bootstrap_rejects_cross_origin_and_rebinding(db:PgPool){let h=Harness::new(db).await;for(host,origin)in[("localhost:5173","http://evil.example"),("evil.example","http://localhost:5173")]{let r=h.router.clone().oneshot(Request::builder().method("POST").uri("/api/v1/auth/dev/bootstrap").header("host",host).header("origin",origin).body(Body::empty()).unwrap()).await.unwrap();assert_eq!(r.status(),StatusCode::FORBIDDEN);}}
 #[sqlx::test(migrations="./migrations")]async fn mutations_reject_missing_csrf(db:PgPool){let h=Harness::new(db).await;let mut s=h.login().await;s.csrf.clear();let(status,_,_)=h.request("POST","/auth/dev/switch",Some(&s),json!({"user_id":h.id("volunteer").await})).await;assert_eq!(status,StatusCode::FORBIDDEN);}
@@ -28,6 +121,20 @@ impl Harness{
 #[sqlx::test(migrations="./migrations")]async fn multiple_memberships_and_service_year_gaps(db:PgPool){let h=Harness::new(db).await;let s=h.login().await;let id=h.id("staff").await;for dept in ["Registration","Programming"]{let(_,b,_)=h.request("GET",&format!("/users?department={}",h.dept(dept).await),Some(&s),Value::Null).await;assert!(b["items"].as_array().unwrap().iter().any(|u|u["id"]==id.to_string()));}let(_,b,_)=h.request("GET",&format!("/users/{id}"),Some(&s),Value::Null).await;assert_eq!(b["verified_years"],3);assert_eq!(b["service_years"],json!([2021,2023,2025]));let hr=h.id("hr").await;let(_,b,_)=h.request("GET",&format!("/users/{hr}"),Some(&s),Value::Null).await;assert_eq!(b["verified_years"],2);}
 #[sqlx::test(migrations="./migrations")]async fn lead_scope_does_not_leak_outside_departments(db:PgPool){let h=Harness::new(db).await;let hr=h.login().await;let lead=h.switch(&hr,"lead").await;let target=h.id("staff2").await;assert_eq!(h.request("GET",&format!("/users/{target}"),Some(&lead),Value::Null).await.0,StatusCode::FORBIDDEN);let(_,b,_)=h.request("GET","/users",Some(&lead),Value::Null).await;assert!(!b["items"].as_array().unwrap().iter().any(|u|u["id"]==target.to_string()));}
 #[sqlx::test(migrations="./migrations")]async fn director_has_no_implicit_admin(db:PgPool){let h=Harness::new(db).await;let hr=h.login().await;let d=h.switch(&hr,"director").await;assert_eq!(h.request("GET","/permission-grants",Some(&d),Value::Null).await.0,StatusCode::FORBIDDEN);assert_eq!(h.request("GET","/audit-events",Some(&d),Value::Null).await.0,StatusCode::FORBIDDEN);}
+#[sqlx::test(migrations="./migrations")]async fn permission_thresholds_enforce_boundary_and_revocation(db:PgPool){
+ let h=Harness::new(db).await;let hr=h.login().await;let sys=h.switch(&hr,"sys").await;
+ assert_eq!(h.request("PUT","/permission-thresholds",Some(&sys),json!({"permission":"audit.read","minimum_rank":30})).await.0,StatusCode::OK);
+ assert_eq!(h.request("PUT","/permission-thresholds",Some(&sys),json!({"permission":"audit.read","minimum_rank":0})).await.0,StatusCode::BAD_REQUEST);
+ assert_eq!(h.request("PUT","/permission-thresholds",Some(&sys),json!({"permission":"unknown","minimum_rank":30})).await.0,StatusCode::BAD_REQUEST);
+ let director=h.switch(&sys,"director").await;
+ assert_eq!(h.request("GET","/audit-events",Some(&director),Value::Null).await.0,StatusCode::OK);
+ let lead=h.switch(&director,"lead").await;
+ assert_eq!(h.request("GET","/audit-events",Some(&lead),Value::Null).await.0,StatusCode::FORBIDDEN);
+ let sys=h.switch(&lead,"sys").await;
+ assert_eq!(h.request("PUT","/permission-thresholds",Some(&sys),json!({"permission":"audit.read","minimum_rank":null})).await.0,StatusCode::OK);
+ let director=h.switch(&sys,"director").await;
+ assert_eq!(h.request("GET","/audit-events",Some(&director),Value::Null).await.0,StatusCode::FORBIDDEN);
+}
 #[sqlx::test(migrations="./migrations")]async fn manager_cycle_is_rejected_and_directs_are_inverse(db:PgPool){let h=Harness::new(db).await;let s=h.login().await;let lead=h.id("lead").await;let staff=h.id("staff").await;assert_eq!(h.request("PATCH",&format!("/users/{lead}"),Some(&s),json!({"manager_id":staff})).await.0,StatusCode::BAD_REQUEST);let(_,b,_)=h.request("GET",&format!("/users/{lead}/directs"),Some(&s),Value::Null).await;assert!(b.as_array().unwrap().iter().any(|u|u["id"]==staff.to_string()));}
 #[sqlx::test(migrations="./migrations")]async fn years_are_idempotent_and_corrections_audited(db:PgPool){let h=Harness::new(db).await;let s=h.login().await;let id=h.id("staff").await;for _ in 0..2{assert_eq!(h.request("PUT",&format!("/users/{id}/service-years/2023"),Some(&s),json!({"verification_status":"verified"})).await.0,StatusCode::OK);}let n:i64=sqlx::query_scalar("SELECT count(*) FROM user_service_years WHERE user_id=$1").bind(id).fetch_one(&h.db).await.unwrap();assert_eq!(n,3);let n:i64=sqlx::query_scalar("SELECT count(*) FROM audit_events WHERE resource_id=$1 AND action='service_year.recorded'").bind(id).fetch_one(&h.db).await.unwrap();assert_eq!(n,2);}
 #[sqlx::test(migrations="./migrations")]async fn lead_can_mark_team_activity_and_only_active_members_receive_verified_years(db:PgPool){let h=Harness::new(db).await;let hr=h.login().await;let lead=h.switch(&hr,"lead").await;let department=h.dept("Registration").await;let lead_id=h.id("lead").await;assert_eq!(h.request("GET",&format!("/departments/{department}/members"),Some(&lead),Value::Null).await.0,StatusCode::OK);assert_eq!(h.request("PATCH",&format!("/departments/{department}/members/{lead_id}"),Some(&lead),json!({"membership_status":"inactive"})).await.0,StatusCode::OK);let hr=h.login().await;assert_eq!(h.request("PUT",&format!("/users/{lead_id}/service-years/2026"),Some(&hr),json!({"verification_status":"verified"})).await.0,StatusCode::BAD_REQUEST);let lead=h.switch(&hr,"lead").await;assert_eq!(h.request("PATCH",&format!("/departments/{department}/members/{lead_id}"),Some(&lead),json!({"membership_status":"active"})).await.0,StatusCode::OK);let hr=h.login().await;assert_eq!(h.request("PUT",&format!("/users/{lead_id}/service-years/2026"),Some(&hr),json!({"verification_status":"verified"})).await.0,StatusCode::OK);}
